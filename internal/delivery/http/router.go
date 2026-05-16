@@ -9,6 +9,7 @@ import (
 	authapp "github.com/hajimohammadinet/dabir/internal/application/auth"
 	settingsapp "github.com/hajimohammadinet/dabir/internal/application/settings"
 	setupapp "github.com/hajimohammadinet/dabir/internal/application/setup"
+	usersapp "github.com/hajimohammadinet/dabir/internal/application/users"
 	"github.com/hajimohammadinet/dabir/internal/config"
 	"github.com/hajimohammadinet/dabir/internal/delivery/http/handlers"
 	httpmiddleware "github.com/hajimohammadinet/dabir/internal/delivery/http/middleware"
@@ -51,6 +52,20 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	meUseCase := authapp.NewMeUseCase(userRepo)
 	authHandler := handlers.NewAuthHandler(loginUseCase, meUseCase)
 
+	createUserUseCase := usersapp.NewCreateUserUseCase(userRepo, passwordHasher)
+	listUsersUseCase := usersapp.NewListUsersUseCase(userRepo)
+	getUserUseCase := usersapp.NewGetUserUseCase(userRepo)
+	updateUserUseCase := usersapp.NewUpdateUserUseCase(userRepo)
+	setUserActiveUseCase := usersapp.NewSetUserActiveUseCase(userRepo)
+
+	userHandler := handlers.NewUserHandler(
+		createUserUseCase,
+		listUsersUseCase,
+		getUserUseCase,
+		updateUserUseCase,
+		setUserActiveUseCase,
+	)
+
 	r.Get("/healthz", healthHandler.Healthz)
 	r.Get("/readyz", healthHandler.Readyz)
 
@@ -80,6 +95,18 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 						w.WriteHeader(http.StatusNoContent)
 					})
 			})
+		})
+
+		r.Route("/users", func(r chi.Router) {
+			r.Use(httpmiddleware.AuthMiddleware(jwtService))
+			r.Use(httpmiddleware.RequireRoles(user.RoleSuperUser))
+
+			r.Post("/", userHandler.Create)
+			r.Get("/", userHandler.List)
+			r.Get("/{id}", userHandler.GetByID)
+			r.Patch("/{id}", userHandler.Update)
+			r.Patch("/{id}/deactivate", userHandler.Deactivate)
+			r.Patch("/{id}/activate", userHandler.Activate)
 		})
 	})
 

@@ -154,3 +154,148 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, e
 
 	return u, nil
 }
+
+func (r *UserRepository) List(ctx context.Context, filter user.ListFilter) ([]user.User, int, error) {
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+
+	if filter.PageSize <= 0 {
+		filter.PageSize = 20
+	}
+
+	offset := (filter.Page - 1) * filter.PageSize
+
+	where := "WHERE 1=1"
+	args := []interface{}{}
+	argPos := 1
+
+	if filter.Search != "" {
+		where += fmt.Sprintf(" AND (username ILIKE $%d OR full_name ILIKE $%d)", argPos, argPos)
+		args = append(args, "%"+filter.Search+"%")
+		argPos++
+	}
+
+	if filter.Role != nil {
+		where += fmt.Sprintf(" AND role = $%d", argPos)
+		args = append(args, string(*filter.Role))
+		argPos++
+	}
+
+	if filter.IsActive != nil {
+		where += fmt.Sprintf(" AND is_active = $%d", argPos)
+		args = append(args, *filter.IsActive)
+		argPos++
+	}
+
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM users
+		%s
+	`, where)
+
+	var total int
+	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			id,
+			username,
+			full_name,
+			password_hash,
+			role,
+			is_active,
+			created_at,
+			updated_at
+		FROM users
+		%s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, where, argPos, argPos+1)
+
+	args = append(args, filter.PageSize, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]user.User, 0)
+
+	for rows.Next() {
+		u := user.User{}
+		var role string
+
+		if err := rows.Scan(
+			&u.ID,
+			&u.Username,
+			&u.FullName,
+			&u.PasswordHash,
+			&role,
+			&u.IsActive,
+			&u.CreatedAt,
+			&u.UpdatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
+		}
+
+		u.Role = user.Role(role)
+		items = append(items, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("failed to iterate users: %w", err)
+	}
+
+	return items, total, nil
+}
+
+func (r *UserRepository) Update(ctx context.Context, u *user.User) error {
+	const query = `
+		UPDATE users
+		SET
+			full_name = $1,
+			role = $2,
+			is_active = $3,
+			updated_at = NOW()
+		WHERE id = $4
+		RETURNING updated_at
+	`
+
+	if err := r.db.QueryRow(
+		ctx,
+		query,
+		u.FullName,
+		string(u.Role),
+		u.IsActive,
+		u.ID,
+	).Scan(&u.UpdatedAt); err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return nil
+}
+
+func (r *UserRepository) SetActive(ctx context.Context, id string, isActive bool) error {
+	const query = `
+		UPDATE users
+		SET
+			is_active = $1,
+			updated_at = NOW()
+		WHERE id = $2
+	`
+
+	result, err := r.db.Exec(ctx, query, isActive, id)
+	if err != nil {
+		return fmt.Errorf("failed to set user active status: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}

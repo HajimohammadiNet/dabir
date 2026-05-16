@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	authapp "github.com/hajimohammadinet/dabir/internal/application/auth"
+	lettersapp "github.com/hajimohammadinet/dabir/internal/application/letters"
 	settingsapp "github.com/hajimohammadinet/dabir/internal/application/settings"
 	setupapp "github.com/hajimohammadinet/dabir/internal/application/setup"
 	usersapp "github.com/hajimohammadinet/dabir/internal/application/users"
@@ -66,6 +67,23 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		setUserActiveUseCase,
 	)
 
+	letterRepo := postgres.NewLetterRepository(db)
+	letterConfigProvider := lettersapp.NewLetterConfigProvider(settingsRepo)
+
+	createLetterUseCase := lettersapp.NewCreateLetterUseCase(letterRepo, letterConfigProvider)
+	listLettersUseCase := lettersapp.NewListLettersUseCase(letterRepo, letterConfigProvider)
+	getLetterUseCase := lettersapp.NewGetLetterUseCase(letterRepo, letterConfigProvider)
+	updateLetterUseCase := lettersapp.NewUpdateLetterUseCase(letterRepo, letterConfigProvider)
+	deleteLetterUseCase := lettersapp.NewDeleteLetterUseCase(letterRepo)
+
+	letterHandler := handlers.NewLetterHandler(
+		createLetterUseCase,
+		listLettersUseCase,
+		getLetterUseCase,
+		updateLetterUseCase,
+		deleteLetterUseCase,
+	)
+
 	r.Get("/healthz", healthHandler.Healthz)
 	r.Get("/readyz", healthHandler.Readyz)
 
@@ -107,6 +125,25 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Patch("/{id}", userHandler.Update)
 			r.Patch("/{id}/deactivate", userHandler.Deactivate)
 			r.Patch("/{id}/activate", userHandler.Activate)
+		})
+
+		r.Route("/letters", func(r chi.Router) {
+			r.Use(httpmiddleware.AuthMiddleware(jwtService))
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
+				Get("/", letterHandler.List)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
+				Get("/{id}", letterHandler.GetByID)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
+				Post("/", letterHandler.Create)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
+				Patch("/{id}", letterHandler.Update)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
+				Delete("/{id}", letterHandler.Delete)
 		})
 	})
 

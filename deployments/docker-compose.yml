@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dabir-postgres
+    environment:
+      POSTGRES_DB: dabir
+      POSTGRES_USER: dabir
+      POSTGRES_PASSWORD: dabir_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - dabir_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dabir -d dabir"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dabir_postgres_data:

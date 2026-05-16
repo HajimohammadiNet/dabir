@@ -35,7 +35,7 @@ func New(ctx context.Context) (*App, error) {
 		return nil, err
 	}
 
-	router := deliveryhttp.NewRouter(db)
+	router := deliveryhttp.NewRouter(db, cfg)
 
 	server := &http.Server{
 		Addr:              cfg.App.Address(),

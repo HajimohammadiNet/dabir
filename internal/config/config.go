@@ -7,8 +7,14 @@ import (
 )
 
 type Config struct {
-	App AppConfig
-	DB  DatabaseConfig
+	App  AppConfig
+	DB   DatabaseConfig
+	Auth AuthConfig
+}
+
+type AuthConfig struct {
+	JWTSecret                string `env:"JWT_SECRET,required"`
+	JWTAccessTokenTTLMinutes int    `env:"JWT_ACCESS_TOKEN_TTL_MINUTES" envDefault:"60"`
 }
 
 type AppConfig struct {

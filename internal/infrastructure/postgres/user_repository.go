@@ -111,3 +111,46 @@ func (r *UserRepository) FindByUsername(ctx context.Context, username string) (*
 
 	return u, nil
 }
+
+func (r *UserRepository) FindByID(ctx context.Context, id string) (*user.User, error) {
+	const query = `
+		SELECT
+			id,
+			username,
+			full_name,
+			password_hash,
+			role,
+			is_active,
+			created_at,
+			updated_at
+		FROM users
+		WHERE id = $1
+		LIMIT 1
+	`
+
+	u := &user.User{}
+	var role string
+
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&u.ID,
+		&u.Username,
+		&u.FullName,
+		&u.PasswordHash,
+		&role,
+		&u.IsActive,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("failed to find user by id: %w", err)
+	}
+
+	u.Role = user.Role(role)
+
+	return u, nil
+}

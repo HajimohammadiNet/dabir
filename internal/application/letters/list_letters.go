@@ -19,8 +19,9 @@ type ListLettersInput struct {
 	PageSize int
 
 	Search        string
-	Destination   string
 	RegistrarName string
+	Sender        string
+	Receiver      string
 
 	FromDate string
 	ToDate   string
@@ -60,15 +61,17 @@ func (uc *ListLettersUseCase) Execute(ctx context.Context, input ListLettersInpu
 	}
 
 	input.Search = strings.TrimSpace(input.Search)
-	input.Destination = strings.TrimSpace(input.Destination)
 	input.RegistrarName = strings.TrimSpace(input.RegistrarName)
+	input.Sender = strings.TrimSpace(input.Sender)
+	input.Receiver = strings.TrimSpace(input.Receiver)
 
 	filter := letter.ListFilter{
 		Page:           input.Page,
 		PageSize:       input.PageSize,
 		Search:         input.Search,
-		Destination:    input.Destination,
 		RegistrarName:  input.RegistrarName,
+		Sender:         input.Sender,
+		Receiver:       input.Receiver,
 		IncludeDeleted: input.IncludeDeleted,
 	}
 

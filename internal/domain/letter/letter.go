@@ -6,11 +6,14 @@ type Letter struct {
 	ID           string
 	LetterNumber int64
 
-	Title         string
-	LetterDate    time.Time
+	Title      string
+	LetterDate time.Time
+
 	RegistrarName string
-	Destination   string
-	Description   *string
+	Sender        string
+	Receiver      string
+
+	Description *string
 
 	CreatedBy string
 	UpdatedBy *string

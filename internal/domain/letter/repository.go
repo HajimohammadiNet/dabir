@@ -20,8 +20,9 @@ type ListFilter struct {
 	PageSize int
 
 	Search        string
-	Destination   string
 	RegistrarName string
+	Sender        string
+	Receiver      string
 
 	FromDate *time.Time
 	ToDate   *time.Time

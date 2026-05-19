@@ -40,12 +40,14 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 			title,
 			letter_date,
 			registrar_name,
+			sender,
+			receiver,
 			destination,
 			description,
 			created_by,
 			is_deleted
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, false)
+		VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, false)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -56,7 +58,8 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 		l.Title,
 		l.LetterDate,
 		l.RegistrarName,
-		l.Destination,
+		l.Sender,
+		l.Receiver,
 		l.Description,
 		l.CreatedBy,
 	).Scan(&l.ID, &l.CreatedAt, &l.UpdatedAt)
@@ -76,6 +79,8 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 			title,
 			letter_date,
 			registrar_name,
+			sender,
+			receiver,
 			destination,
 			description,
 			created_by,
@@ -98,7 +103,8 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 		&l.Title,
 		&l.LetterDate,
 		&l.RegistrarName,
-		&l.Destination,
+		&l.Sender,
+		&l.Receiver,
 		&l.Description,
 		&l.CreatedBy,
 		&l.UpdatedBy,
@@ -141,7 +147,8 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 
 	if filter.Search != "" {
 		where += fmt.Sprintf(
-			" AND (title ILIKE $%d OR destination ILIKE $%d OR registrar_name ILIKE $%d OR CAST(letter_number AS TEXT) ILIKE $%d)",
+			" AND (title ILIKE $%d OR sender ILIKE $%d OR receiver ILIKE $%d OR registrar_name ILIKE $%d OR CAST(letter_number AS TEXT) ILIKE $%d)",
+			argPos,
 			argPos,
 			argPos,
 			argPos,
@@ -151,15 +158,21 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 		argPos++
 	}
 
-	if filter.Destination != "" {
-		where += fmt.Sprintf(" AND destination ILIKE $%d", argPos)
-		args = append(args, "%"+filter.Destination+"%")
-		argPos++
-	}
-
 	if filter.RegistrarName != "" {
 		where += fmt.Sprintf(" AND registrar_name ILIKE $%d", argPos)
 		args = append(args, "%"+filter.RegistrarName+"%")
+		argPos++
+	}
+
+	if filter.Sender != "" {
+		where += fmt.Sprintf(" AND sender ILIKE $%d", argPos)
+		args = append(args, "%"+filter.Sender+"%")
+		argPos++
+	}
+
+	if filter.Receiver != "" {
+		where += fmt.Sprintf(" AND receiver ILIKE $%d", argPos)
+		args = append(args, "%"+filter.Receiver+"%")
 		argPos++
 	}
 
@@ -193,6 +206,8 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 			title,
 			letter_date,
 			registrar_name,
+			sender,
+			receiver,
 			destination,
 			description,
 			created_by,
@@ -227,7 +242,8 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 			&l.Title,
 			&l.LetterDate,
 			&l.RegistrarName,
-			&l.Destination,
+			&l.Sender,
+			&l.Receiver,
 			&l.Description,
 			&l.CreatedBy,
 			&l.UpdatedBy,
@@ -256,13 +272,14 @@ func (r *LetterRepository) Update(ctx context.Context, l *letter.Letter) error {
 		SET
 			title = $1,
 			letter_date = $2,
-			registrar_name = $3,
+			sender = $3,
+			receiver = $4,
 			destination = $4,
 			description = $5,
 			updated_by = $6,
 			updated_at = NOW()
 		WHERE id = $7
-		  AND is_deleted = false
+		AND is_deleted = false
 		RETURNING updated_at
 	`
 
@@ -271,8 +288,8 @@ func (r *LetterRepository) Update(ctx context.Context, l *letter.Letter) error {
 		query,
 		l.Title,
 		l.LetterDate,
-		l.RegistrarName,
-		l.Destination,
+		l.Sender,
+		l.Receiver,
 		l.Description,
 		l.UpdatedBy,
 		l.ID,

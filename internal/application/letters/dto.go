@@ -12,11 +12,14 @@ type LetterDTO struct {
 	LetterNumber          int64  `json:"letter_number"`
 	FormattedLetterNumber string `json:"formatted_letter_number"`
 
-	Title         string  `json:"title"`
-	LetterDate    string  `json:"letter_date"`
-	RegistrarName string  `json:"registrar_name"`
-	Destination   string  `json:"destination"`
-	Description   *string `json:"description,omitempty"`
+	Title      string `json:"title"`
+	LetterDate string `json:"letter_date"`
+
+	RegistrarName string `json:"registrar_name"`
+	Sender        string `json:"sender"`
+	Receiver      string `json:"receiver"`
+
+	Description *string `json:"description,omitempty"`
 
 	CreatedBy string  `json:"created_by"`
 	UpdatedBy *string `json:"updated_by,omitempty"`
@@ -42,7 +45,8 @@ func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 		Title:         l.Title,
 		LetterDate:    l.LetterDate.Format("2006-01-02"),
 		RegistrarName: l.RegistrarName,
-		Destination:   l.Destination,
+		Sender:        l.Sender,
+		Receiver:      l.Receiver,
 		Description:   l.Description,
 
 		CreatedBy: l.CreatedBy,

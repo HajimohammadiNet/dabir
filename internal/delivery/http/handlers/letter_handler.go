@@ -57,6 +57,7 @@ func (h *LetterHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	input.ActorUserID = authUser.ID
+	input.RegistrarName = authUser.Username
 
 	output, err := h.createLetterUseCase.Execute(r.Context(), input)
 	if err != nil {
@@ -100,8 +101,9 @@ func (h *LetterHandler) List(w http.ResponseWriter, r *http.Request) {
 		Page:           page,
 		PageSize:       pageSize,
 		Search:         query.Get("search"),
-		Destination:    query.Get("destination"),
 		RegistrarName:  query.Get("registrar_name"),
+		Sender:         query.Get("sender"),
+		Receiver:       query.Get("receiver"),
 		FromDate:       query.Get("from_date"),
 		ToDate:         query.Get("to_date"),
 		IncludeDeleted: includeDeleted,

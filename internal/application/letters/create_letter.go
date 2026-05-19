@@ -21,13 +21,16 @@ type CreateLetterUseCase struct {
 }
 
 type CreateLetterInput struct {
-	Title         string  `json:"title"`
-	LetterDate    string  `json:"letter_date"`
-	RegistrarName string  `json:"registrar_name"`
-	Destination   string  `json:"destination"`
-	Description   *string `json:"description"`
+	Title      string `json:"title"`
+	LetterDate string `json:"letter_date"`
 
-	ActorUserID string `json:"-"`
+	Sender   string `json:"sender"`
+	Receiver string `json:"receiver"`
+
+	Description *string `json:"description"`
+
+	ActorUserID   string `json:"-"`
+	RegistrarName string `json:"-"`
 }
 
 func NewCreateLetterUseCase(
@@ -63,8 +66,10 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		LetterDate:   letterDate,
 
 		RegistrarName: input.RegistrarName,
-		Destination:   input.Destination,
-		Description:   input.Description,
+		Sender:        input.Sender,
+		Receiver:      input.Receiver,
+
+		Description: input.Description,
 
 		CreatedBy: input.ActorUserID,
 		IsDeleted: false,
@@ -83,8 +88,9 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 func normalizeCreateLetterInput(input CreateLetterInput) CreateLetterInput {
 	input.Title = strings.TrimSpace(input.Title)
 	input.LetterDate = strings.TrimSpace(input.LetterDate)
+	input.Sender = strings.TrimSpace(input.Sender)
+	input.Receiver = strings.TrimSpace(input.Receiver)
 	input.RegistrarName = strings.TrimSpace(input.RegistrarName)
-	input.Destination = strings.TrimSpace(input.Destination)
 
 	if input.Description != nil {
 		desc := strings.TrimSpace(*input.Description)
@@ -115,8 +121,12 @@ func validateCreateLetterInput(input CreateLetterInput) error {
 		return errors.New("registrar_name is required")
 	}
 
-	if input.Destination == "" {
-		return errors.New("destination is required")
+	if input.Sender == "" {
+		return errors.New("sender is required")
+	}
+
+	if input.Receiver == "" {
+		return errors.New("receiver is required")
 	}
 
 	return nil

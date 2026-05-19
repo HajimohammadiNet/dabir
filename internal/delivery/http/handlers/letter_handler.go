@@ -9,9 +9,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
 	lettersapp "github.com/hajimohammadinet/dabir/internal/application/letters"
 	"github.com/hajimohammadinet/dabir/internal/delivery/http/middleware"
 	"github.com/hajimohammadinet/dabir/internal/delivery/http/response"
+	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
 )
 
 type LetterHandler struct {
@@ -20,6 +22,7 @@ type LetterHandler struct {
 	getLetterUseCase    *lettersapp.GetLetterUseCase
 	updateLetterUseCase *lettersapp.UpdateLetterUseCase
 	deleteLetterUseCase *lettersapp.DeleteLetterUseCase
+	auditLogger         *auditapp.Logger
 }
 
 func NewLetterHandler(
@@ -28,6 +31,7 @@ func NewLetterHandler(
 	getLetterUseCase *lettersapp.GetLetterUseCase,
 	updateLetterUseCase *lettersapp.UpdateLetterUseCase,
 	deleteLetterUseCase *lettersapp.DeleteLetterUseCase,
+	auditLogger *auditapp.Logger,
 ) *LetterHandler {
 	return &LetterHandler{
 		createLetterUseCase: createLetterUseCase,
@@ -35,6 +39,7 @@ func NewLetterHandler(
 		getLetterUseCase:    getLetterUseCase,
 		updateLetterUseCase: updateLetterUseCase,
 		deleteLetterUseCase: deleteLetterUseCase,
+		auditLogger:         auditLogger,
 	}
 }
 
@@ -58,6 +63,19 @@ func (h *LetterHandler) Create(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "CREATE_LETTER_FAILED", err.Error())
 		return
 	}
+
+	actorID := authUser.ID
+	entityID := output.ID
+
+	h.auditLogger.Log(r.Context(), auditapp.LogInput{
+		ActorUserID: &actorID,
+		Action:      domainaudit.ActionLetterCreated,
+		EntityType:  "letter",
+		EntityID:    &entityID,
+		IPAddress:   requestIP(r),
+		UserAgent:   requestUserAgent(r),
+		NewValue:    output,
+	})
 
 	response.JSON(w, http.StatusCreated, output)
 }
@@ -122,6 +140,8 @@ func (h *LetterHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 
+	oldOutput, _ := h.getLetterUseCase.Execute(r.Context(), id)
+
 	var input lettersapp.UpdateLetterInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.Error(w, http.StatusBadRequest, "INVALID_REQUEST_BODY", "invalid request body")
@@ -142,17 +162,33 @@ func (h *LetterHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorID := authUser.ID
+	entityID := output.ID
+
+	h.auditLogger.Log(r.Context(), auditapp.LogInput{
+		ActorUserID: &actorID,
+		Action:      domainaudit.ActionLetterUpdated,
+		EntityType:  "letter",
+		EntityID:    &entityID,
+		IPAddress:   requestIP(r),
+		UserAgent:   requestUserAgent(r),
+		OldValue:    oldOutput,
+		NewValue:    output,
+	})
+
 	response.JSON(w, http.StatusOK, output)
 }
 
 func (h *LetterHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	authUser, ok := middleware.GetAuthUser(r.Context())
+
 	if !ok {
 		response.Error(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication is required")
 		return
 	}
 
 	id := chi.URLParam(r, "id")
+	oldOutput, _ := h.getLetterUseCase.Execute(r.Context(), id)
 
 	err := h.deleteLetterUseCase.Execute(r.Context(), lettersapp.DeleteLetterInput{
 		ID:          id,
@@ -167,6 +203,22 @@ func (h *LetterHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, http.StatusBadRequest, "DELETE_LETTER_FAILED", err.Error())
 		return
 	}
+
+	actorID := authUser.ID
+	entityID := id
+
+	h.auditLogger.Log(r.Context(), auditapp.LogInput{
+		ActorUserID: &actorID,
+		Action:      domainaudit.ActionLetterDeleted,
+		EntityType:  "letter",
+		EntityID:    &entityID,
+		IPAddress:   requestIP(r),
+		UserAgent:   requestUserAgent(r),
+		OldValue:    oldOutput,
+		NewValue: map[string]interface{}{
+			"deleted": true,
+		},
+	})
 
 	response.JSON(w, http.StatusOK, map[string]bool{
 		"deleted": true,

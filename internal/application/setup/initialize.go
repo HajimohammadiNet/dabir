@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
+	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
 	"github.com/hajimohammadinet/dabir/internal/domain/settings"
 	"github.com/hajimohammadinet/dabir/internal/domain/user"
 )
@@ -21,6 +23,7 @@ type InitializeUseCase struct {
 	userRepo       user.Repository
 	settingsRepo   settings.Repository
 	passwordHasher PasswordHasher
+	auditLogger    *auditapp.Logger
 }
 
 type InitializeInput struct {
@@ -55,11 +58,13 @@ func NewInitializeUseCase(
 	userRepo user.Repository,
 	settingsRepo settings.Repository,
 	passwordHasher PasswordHasher,
+	auditLogger *auditapp.Logger,
 ) *InitializeUseCase {
 	return &InitializeUseCase{
 		userRepo:       userRepo,
 		settingsRepo:   settingsRepo,
 		passwordHasher: passwordHasher,
+		auditLogger:    auditLogger,
 	}
 }
 
@@ -98,6 +103,25 @@ func (uc *InitializeUseCase) Execute(ctx context.Context, input InitializeInput)
 
 	if err := uc.saveInitialSettings(ctx, input); err != nil {
 		return nil, err
+	}
+
+	if uc.auditLogger != nil {
+		actorID := superUser.ID
+
+		uc.auditLogger.Log(ctx, auditapp.LogInput{
+			ActorUserID: &actorID,
+			Action:      domainaudit.ActionSetupInitialized,
+			EntityType:  "setup",
+			EntityID:    nil,
+			NewValue: map[string]interface{}{
+				"organization_name": input.OrganizationName,
+				"superuser": map[string]interface{}{
+					"id":       superUser.ID,
+					"username": superUser.Username,
+				},
+				"letter_config": input.LetterConfig,
+			},
+		})
 	}
 
 	return &InitializeOutput{

@@ -33,6 +33,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	input.IPAddress = requestIP(r)
+	input.UserAgent = requestUserAgent(r)
+
 	output, err := h.loginUseCase.Execute(r.Context(), input)
 	if err != nil {
 		if errors.Is(err, authapp.ErrInvalidCredentials) {

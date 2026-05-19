@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
 	authapp "github.com/hajimohammadinet/dabir/internal/application/auth"
 	lettersapp "github.com/hajimohammadinet/dabir/internal/application/letters"
 	settingsapp "github.com/hajimohammadinet/dabir/internal/application/settings"
@@ -29,12 +30,15 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	settingsRepo := postgres.NewSettingsRepository(db)
 	passwordHasher := security.NewPasswordHasher()
 	jwtService := infraauth.NewJWTService(cfg.Auth)
+	auditRepo := postgres.NewAuditRepository(db)
+	auditLogger := auditapp.NewLogger(auditRepo)
 
 	checkStatusUseCase := setupapp.NewCheckStatusUseCase(userRepo)
 	initializeUseCase := setupapp.NewInitializeUseCase(
 		userRepo,
 		settingsRepo,
 		passwordHasher,
+		auditLogger,
 	)
 
 	setupHandler := handlers.NewSetupHandler(
@@ -49,6 +53,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		userRepo,
 		passwordHasher,
 		jwtService,
+		auditLogger,
 	)
 	meUseCase := authapp.NewMeUseCase(userRepo)
 	authHandler := handlers.NewAuthHandler(loginUseCase, meUseCase)
@@ -65,6 +70,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		getUserUseCase,
 		updateUserUseCase,
 		setUserActiveUseCase,
+		auditLogger,
 	)
 
 	letterRepo := postgres.NewLetterRepository(db)
@@ -82,7 +88,11 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		getLetterUseCase,
 		updateLetterUseCase,
 		deleteLetterUseCase,
+		auditLogger,
 	)
+
+	listAuditLogsUseCase := auditapp.NewListAuditLogsUseCase(auditRepo)
+	auditHandler := handlers.NewAuditHandler(listAuditLogsUseCase)
 
 	r.Get("/healthz", healthHandler.Healthz)
 	r.Get("/readyz", healthHandler.Readyz)
@@ -144,6 +154,13 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 
 			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
 				Delete("/{id}", letterHandler.Delete)
+		})
+
+		r.Route("/audit-logs", func(r chi.Router) {
+			r.Use(httpmiddleware.AuthMiddleware(jwtService))
+			r.Use(httpmiddleware.RequireRoles(user.RoleSuperUser))
+
+			r.Get("/", auditHandler.List)
 		})
 	})
 

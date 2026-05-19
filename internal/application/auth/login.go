@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
+	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
 	"github.com/hajimohammadinet/dabir/internal/domain/user"
 )
 
@@ -26,11 +28,14 @@ type LoginUseCase struct {
 	userRepo         user.Repository
 	passwordComparer PasswordComparer
 	tokenGenerator   TokenGenerator
+	auditLogger      *auditapp.Logger
 }
 
 type LoginInput struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username  string  `json:"username"`
+	Password  string  `json:"password"`
+	IPAddress *string `json:"-"`
+	UserAgent *string `json:"-"`
 }
 
 type LoginOutput struct {
@@ -51,11 +56,13 @@ func NewLoginUseCase(
 	userRepo user.Repository,
 	passwordComparer PasswordComparer,
 	tokenGenerator TokenGenerator,
+	auditLogger *auditapp.Logger,
 ) *LoginUseCase {
 	return &LoginUseCase{
 		userRepo:         userRepo,
 		passwordComparer: passwordComparer,
 		tokenGenerator:   tokenGenerator,
+		auditLogger:      auditLogger,
 	}
 }
 
@@ -63,6 +70,7 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	username := strings.TrimSpace(input.Username)
 
 	if username == "" || input.Password == "" {
+		uc.logLoginFailed(ctx, input, "empty_username_or_password")
 		return nil, ErrInvalidCredentials
 	}
 
@@ -72,14 +80,17 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	}
 
 	if u == nil {
+		uc.logLoginFailed(ctx, input, "user_not_found")
 		return nil, ErrInvalidCredentials
 	}
 
 	if !u.IsActive {
+		uc.logLoginFailed(ctx, input, "inactive_user")
 		return nil, ErrInactiveUser
 	}
 
 	if err := uc.passwordComparer.Compare(u.PasswordHash, input.Password); err != nil {
+		uc.logLoginFailed(ctx, input, "invalid_password")
 		return nil, ErrInvalidCredentials
 	}
 
@@ -87,6 +98,8 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logLoginSuccess(ctx, input, u)
 
 	return &LoginOutput{
 		AccessToken: token,
@@ -99,4 +112,34 @@ func (uc *LoginUseCase) Execute(ctx context.Context, input LoginInput) (*LoginOu
 			Role:     u.Role,
 		},
 	}, nil
+}
+
+func (uc *LoginUseCase) logLoginFailed(ctx context.Context, input LoginInput, reason string) {
+	uc.auditLogger.Log(ctx, auditapp.LogInput{
+		Action:     domainaudit.ActionAuthLoginFailed,
+		EntityType: "auth",
+		IPAddress:  input.IPAddress,
+		UserAgent:  input.UserAgent,
+		NewValue: map[string]interface{}{
+			"username": input.Username,
+			"reason":   reason,
+		},
+	})
+}
+
+func (uc *LoginUseCase) logLoginSuccess(ctx context.Context, input LoginInput, u *user.User) {
+	userID := u.ID
+
+	uc.auditLogger.Log(ctx, auditapp.LogInput{
+		ActorUserID: &userID,
+		Action:      domainaudit.ActionAuthLoginSuccess,
+		EntityType:  "auth",
+		EntityID:    &userID,
+		IPAddress:   input.IPAddress,
+		UserAgent:   input.UserAgent,
+		NewValue: map[string]interface{}{
+			"username": u.Username,
+			"role":     u.Role,
+		},
+	})
 }

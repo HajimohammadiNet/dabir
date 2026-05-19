@@ -2,18 +2,22 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache git ca-certificates tzdata
+
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN go build -o dabir-api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /dabir-api ./cmd/api
 
 FROM alpine:3.21
 
 WORKDIR /app
 
-COPY --from=builder /app/dabir-api /app/dabir-api
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /dabir-api /app/dabir-api
 
 EXPOSE 8080
 

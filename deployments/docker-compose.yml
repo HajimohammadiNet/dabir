@@ -3,18 +3,47 @@ services:
     image: postgres:16-alpine
     container_name: dabir-postgres
     environment:
-      POSTGRES_DB: dabir
-      POSTGRES_USER: dabir
-      POSTGRES_PASSWORD: dabir_secret
+      POSTGRES_DB: ${DB_NAME:-dabir}
+      POSTGRES_USER: ${DB_USER:-dabir}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dabir_secret}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - dabir_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dabir -d dabir"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dabir} -d ${DB_NAME:-dabir}"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: dabir-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${APP_NAME:-dabir}
+      APP_ENV: ${APP_ENV:-development}
+      APP_HOST: 0.0.0.0
+      APP_PORT: ${APP_PORT:-8080}
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-dabir}
+      DB_PASSWORD: ${DB_PASSWORD:-dabir_secret}
+      DB_NAME: ${DB_NAME:-dabir}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-10}
+
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret-change-in-production}
+      JWT_ACCESS_TOKEN_TTL_MINUTES: ${JWT_ACCESS_TOKEN_TTL_MINUTES:-60}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    restart: unless-stopped
 
 volumes:
   dabir_postgres_data:

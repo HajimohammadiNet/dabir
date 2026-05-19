@@ -9,6 +9,7 @@ import (
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -327,6 +328,86 @@ func (r *LetterRepository) SoftDelete(ctx context.Context, id string, deletedBy 
 
 	if result.RowsAffected() == 0 {
 		return pgx.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Letter) error {
+	if len(letters) == 0 {
+		return nil
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	const query = `
+		INSERT INTO letters (
+			letter_number,
+			title,
+			letter_date,
+			registrar_name,
+			sender,
+			receiver,
+			destination,
+			description,
+			created_by,
+			is_deleted
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, false)
+	`
+
+	batch := &pgx.Batch{}
+
+	for _, l := range letters {
+		batch.Queue(
+			query,
+			l.LetterNumber,
+			l.Title,
+			l.LetterDate,
+			l.RegistrarName,
+			l.Sender,
+			l.Receiver,
+			l.Description,
+			l.CreatedBy,
+		)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+
+	for range letters {
+		_, err := results.Exec()
+		if err != nil {
+			_ = results.Close()
+
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return fmt.Errorf("duplicate letter number found during import: %w", err)
+			}
+
+			return fmt.Errorf("failed to bulk insert letters: %w", err)
+		}
+	}
+
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit bulk insert: %w", err)
+	}
+
+	return nil
+}
+
+func (r *LetterRepository) SetSequenceValue(ctx context.Context, value int64) error {
+	const query = `SELECT setval('letter_number_seq', $1, true)`
+
+	if _, err := r.db.Exec(ctx, query, value); err != nil {
+		return fmt.Errorf("failed to set letter number sequence: %w", err)
 	}
 
 	return nil

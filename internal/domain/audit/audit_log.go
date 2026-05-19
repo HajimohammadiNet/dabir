@@ -33,4 +33,7 @@ const (
 	ActionLetterCreated = "letter.created"
 	ActionLetterUpdated = "letter.updated"
 	ActionLetterDeleted = "letter.deleted"
+
+	ActionLettersImportPreviewed = "letters.import_previewed"
+	ActionLettersImportCommitted = "letters.import_committed"
 )

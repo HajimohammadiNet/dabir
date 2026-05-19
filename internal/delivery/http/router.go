@@ -9,6 +9,7 @@ import (
 
 	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
 	authapp "github.com/hajimohammadinet/dabir/internal/application/auth"
+	importsapp "github.com/hajimohammadinet/dabir/internal/application/imports"
 	lettersapp "github.com/hajimohammadinet/dabir/internal/application/letters"
 	settingsapp "github.com/hajimohammadinet/dabir/internal/application/settings"
 	setupapp "github.com/hajimohammadinet/dabir/internal/application/setup"
@@ -81,6 +82,27 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 	)
 
 	letterRepo := postgres.NewLetterRepository(db)
+
+	importRepo := postgres.NewImportJobRepository(db)
+	letterExcelParser := importsapp.NewLetterExcelParser()
+
+	previewLettersImportUseCase := importsapp.NewPreviewLettersImportUseCase(
+		importRepo,
+		letterExcelParser,
+		auditLogger,
+	)
+	commitLettersImportUseCase := importsapp.NewCommitLettersImportUseCase(
+		importRepo,
+		letterRepo,
+		auditLogger,
+	)
+	getImportJobUseCase := importsapp.NewGetImportJobUseCase(importRepo)
+
+	importHandler := handlers.NewImportHandler(
+		previewLettersImportUseCase,
+		commitLettersImportUseCase,
+		getImportJobUseCase,
+	)
 	letterConfigProvider := lettersapp.NewLetterConfigProvider(settingsRepo)
 
 	createLetterUseCase := lettersapp.NewCreateLetterUseCase(letterRepo, letterConfigProvider)
@@ -161,6 +183,15 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 
 			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
 				Delete("/{id}", letterHandler.Delete)
+		})
+
+		r.Route("/imports", func(r chi.Router) {
+			r.Use(httpmiddleware.AuthMiddleware(jwtService))
+			r.Use(httpmiddleware.RequireRoles(user.RoleSuperUser))
+
+			r.Post("/letters/preview", importHandler.PreviewLetters)
+			r.Post("/letters/{id}/commit", importHandler.CommitLetters)
+			r.Get("/{id}", importHandler.GetByID)
 		})
 
 		r.Route("/audit-logs", func(r chi.Router) {

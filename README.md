@@ -24,6 +24,7 @@ Dabir is designed for teams that need a simple but reliable internal system for 
 - [Authentication](#authentication)
 - [User Management](#user-management)
 - [Letter Management](#letter-management)
+- [Excel Import](#excel-import)
 - [Audit Logs](#audit-logs)
 - [Health Checks](#health-checks)
 - [Development Commands](#development-commands)
@@ -672,6 +673,9 @@ Allowed roles:
 - `superuser`
 - `editor`
 
+`registrar_name` is automatically set from the authenticated user.  
+Do not send `registrar_name` in the request body.
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/letters/ \
   -H "Content-Type: application/json" \
@@ -679,8 +683,8 @@ curl -X POST http://localhost:8080/api/v1/letters/ \
   -d '{
     "title": "Contract Review Request",
     "letter_date": "2026-05-19",
-    "registrar_name": "System Administrator",
-    "destination": "Finance Department",
+    "sender": "Finance Department",
+    "receiver": "Legal Department",
     "description": "Request for contract review"
   }' | jq
 ```
@@ -696,8 +700,9 @@ Example response:
     "formatted_letter_number": "DABIR-000001",
     "title": "Contract Review Request",
     "letter_date": "2026-05-19",
-    "registrar_name": "System Administrator",
-    "destination": "Finance Department",
+    "registrar_name": "admin",
+    "sender": "Finance Department",
+    "receiver": "Legal Department",
     "description": "Request for contract review",
     "created_by": "USER_ID",
     "is_deleted": false,
@@ -732,7 +737,8 @@ curl "http://localhost:8080/api/v1/letters/?page=1&page_size=20" \
 Search matches:
 
 - title
-- destination
+- sender
+- receiver
 - registrar name
 - letter number
 
@@ -741,10 +747,17 @@ curl "http://localhost:8080/api/v1/letters/?search=contract" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
-### Filter by destination
+### Filter by sender
 
 ```bash
-curl "http://localhost:8080/api/v1/letters/?destination=Finance" \
+curl "http://localhost:8080/api/v1/letters/?sender=Finance" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### Filter by receiver
+
+```bash
+curl "http://localhost:8080/api/v1/letters/?receiver=Legal" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
@@ -792,8 +805,8 @@ curl -X PATCH "http://localhost:8080/api/v1/letters/LETTER_ID" \
   -d '{
     "title": "Updated Contract Review Request",
     "letter_date": "2026-05-19",
-    "registrar_name": "System Administrator",
-    "destination": "Legal Department",
+    "sender": "Finance Department",
+    "receiver": "Legal Department",
     "description": "Updated description"
   }' | jq
 ```
@@ -820,6 +833,141 @@ Example response:
   "data": {
     "deleted": true
   }
+}
+```
+
+---
+
+## Excel Import
+
+Dabir supports importing existing letters from Excel files.
+
+This is useful when migrating from spreadsheet-based letter tracking.
+
+Currently supported format:
+
+- `.xlsx`
+
+Import is available only for `superuser`.
+
+### Required columns
+
+The Excel file must contain these logical fields:
+
+| Field | Supported column names |
+|---|---|
+| `letter_number` | `letter_number`, `number`, `no`, `شماره نامه`, `شماره` |
+| `title` | `title`, `subject`, `عنوان`, `عنوان نامه`, `موضوع` |
+| `letter_date` | `letter_date`, `date`, `تاریخ`, `تاریخ نامه` |
+| `sender` | `sender`, `from`, `فرستنده`, `ارسال کننده` |
+| `receiver` | `receiver`, `to`, `گیرنده`, `دریافت کننده`, `مقصد` |
+
+`registrar_name` is not read from Excel.  
+It is automatically set to the username of the user who commits the import.
+
+### Import flow
+
+The import process has two steps:
+
+```text
+Preview Excel file
+    ↓
+Review detected columns, valid rows, errors, and duplicates
+    ↓
+Commit import
+    ↓
+Letters are inserted into database
+    ↓
+Letter number sequence continues from the maximum imported number
+```
+
+### Preview import
+
+```bash
+curl -X POST http://localhost:8080/api/v1/imports/letters/preview \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@letters_import.xlsx" | jq
+```
+
+Example response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "IMPORT_ID",
+    "type": "letters",
+    "status": "previewed",
+    "file_name": "letters_import.xlsx",
+    "total_rows": 2,
+    "valid_rows": 2,
+    "invalid_rows": 0,
+    "max_letter_number": 1002,
+    "detected_columns": {
+      "letter_number": "شماره نامه",
+      "title": "عنوان نامه",
+      "letter_date": "تاریخ نامه",
+      "sender": "فرستنده",
+      "receiver": "گیرنده"
+    },
+    "preview_data": [
+      {
+        "row_number": 2,
+        "letter_number": 1001,
+        "title": "نامه تست ۱",
+        "letter_date": "2026-05-19",
+        "sender": "شرکت الف",
+        "receiver": "شرکت ب"
+      }
+    ],
+    "errors": []
+  }
+}
+```
+
+### Get import job
+
+```bash
+curl "http://localhost:8080/api/v1/imports/IMPORT_ID" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+### Commit import
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/imports/letters/IMPORT_ID/commit" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+Example response:
+```json
+{
+  "success": true,
+  "data": {
+    "import_id": "IMPORT_ID",
+    "imported_rows": 2,
+    "skipped_rows": 0,
+    "next_letter_number": 1003
+  }
+}
+```
+
+### Duplicate detection
+
+During preview, Dabir detects:
+
+- Duplicate letter numbers inside the Excel file
+- Letter numbers that already exist in the database
+
+If invalid rows exist, commit is blocked.
+
+Example error:
+
+```json
+{
+  "row": 3,
+  "field": "letter_number",
+  "message": "duplicate letter number in file, first seen at row 2"
 }
 ```
 
@@ -870,6 +1018,8 @@ user.deactivated
 letter.created
 letter.updated
 letter.deleted
+letters.import_previewed
+letters.import_committed
 ```
 
 ---

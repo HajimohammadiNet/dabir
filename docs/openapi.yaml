@@ -34,6 +34,8 @@ tags:
     description: User management endpoints
   - name: Letters
     description: Letter registry endpoints
+  - name: Imports
+    description: Excel imports
   - name: Audit Logs
     description: Audit log endpoints
 
@@ -339,11 +341,15 @@ paths:
           in: query
           schema:
             type: string
-        - name: destination
+        - name: registrar_name
           in: query
           schema:
             type: string
-        - name: registrar_name
+        - name: sender
+          in: query
+          schema:
+            type: string
+        - name: receiver
           in: query
           schema:
             type: string
@@ -452,6 +458,110 @@ paths:
               schema:
                 $ref: "#/components/schemas/BooleanActionResponse"
 
+
+  /api/v1/imports/letters/preview:
+    post:
+      tags:
+        - Imports
+      operationId: previewLettersImport
+      summary: Preview letters Excel import
+      description: Requires superuser role. Uploads and validates an Excel file without inserting rows into the letters table.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Import preview created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJobResponse"
+        "400":
+          description: Invalid file or import preview failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/imports/letters/{id}/commit:
+    post:
+      tags:
+        - Imports
+      operationId: commitLettersImport
+      summary: Commit letters import
+      description: Requires superuser role. Inserts valid preview rows into the letters table and updates the letter number sequence.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Import committed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommitImportResponse"
+        "400":
+          description: Import has invalid rows or commit failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Import job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Import already committed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/imports/{id}:
+    get:
+      tags:
+        - Imports
+      operationId: getImportJobById
+      summary: Get import job by ID
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Import job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJobResponse"
+        "404":
+          description: Import job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/audit-logs:
     get:
       tags:
@@ -526,6 +636,119 @@ components:
           type: string
         message:
           type: string
+    ImportError:
+      type: object
+      properties:
+        row:
+          type: integer
+        field:
+          type: string
+        message:
+          type: string
+
+    ImportedLetterRow:
+      type: object
+      properties:
+        row_number:
+          type: integer
+        letter_number:
+          type: integer
+          format: int64
+        title:
+          type: string
+        letter_date:
+          type: string
+          format: date
+        sender:
+          type: string
+        receiver:
+          type: string
+
+    ImportJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          example: letters
+        status:
+          type: string
+          enum:
+            - previewed
+            - committed
+            - failed
+        file_name:
+          type: string
+        total_rows:
+          type: integer
+        valid_rows:
+          type: integer
+        invalid_rows:
+          type: integer
+        max_letter_number:
+          type: integer
+          format: int64
+          nullable: true
+        detected_columns:
+          type: object
+          additionalProperties:
+            type: string
+        preview_data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportedLetterRow"
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportError"
+        created_by:
+          type: string
+          format: uuid
+        committed_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        committed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ImportJobResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/ImportJob"
+
+    CommitImportData:
+      type: object
+      properties:
+        import_id:
+          type: string
+          format: uuid
+        imported_rows:
+          type: integer
+        skipped_rows:
+          type: integer
+        next_letter_number:
+          type: integer
+          format: int64
+
+    CommitImportResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/CommitImportData"
 
     ErrorResponse:
       type: object
@@ -838,7 +1061,9 @@ components:
           format: date
         registrar_name:
           type: string
-        destination:
+        sender:
+          type: string
+        receiver:
           type: string
         description:
           type: string
@@ -872,17 +1097,17 @@ components:
       required:
         - title
         - letter_date
-        - registrar_name
-        - destination
+        - sender
+        - receiver
       properties:
         title:
           type: string
         letter_date:
           type: string
           format: date
-        registrar_name:
+        sender:
           type: string
-        destination:
+        receiver:
           type: string
         description:
           type: string

@@ -82,7 +82,6 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 			registrar_name,
 			sender,
 			receiver,
-			destination,
 			description,
 			created_by,
 			updated_by,
@@ -201,28 +200,27 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 	}
 
 	query := fmt.Sprintf(`
-		SELECT
-			id,
-			letter_number,
-			title,
-			letter_date,
-			registrar_name,
-			sender,
-			receiver,
-			destination,
-			description,
-			created_by,
-			updated_by,
-			deleted_by,
-			is_deleted,
-			created_at,
-			updated_at,
-			deleted_at
-		FROM letters
-		%s
-		ORDER BY letter_number DESC
-		LIMIT $%d OFFSET $%d
-	`, where, argPos, argPos+1)
+	SELECT
+		id,
+		letter_number,
+		title,
+		letter_date,
+		registrar_name,
+		sender,
+		receiver,
+		description,
+		created_by,
+		updated_by,
+		deleted_by,
+		is_deleted,
+		created_at,
+		updated_at,
+		deleted_at
+	FROM letters
+	%s
+	ORDER BY letter_number DESC
+	LIMIT $%d OFFSET $%d
+`, where, argPos, argPos+1)
 
 	args = append(args, filter.PageSize, offset)
 

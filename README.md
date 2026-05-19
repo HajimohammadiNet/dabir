@@ -28,6 +28,7 @@ Dabir is designed for teams that need a simple but reliable internal system for 
 - [Health Checks](#health-checks)
 - [Development Commands](#development-commands)
 - [API Response Format](#api-response-format)
+- [API Documentation](#api-documentation)
 - [Letter Numbering Policy](#letter-numbering-policy)
 - [Security Notes](#security-notes)
 - [Roadmap](#roadmap)
@@ -995,6 +996,30 @@ Dabir uses a consistent JSON response format.
     "message": "Human readable error message"
   }
 }
+```
+
+---
+
+## API Documentation
+
+The OpenAPI specification is available at:
+
+```text
+docs/openapi.yaml
+```
+
+You can preview it using Swagger Editor, Redoc, or any OpenAPI-compatible tool.
+
+### Validate OpenAPI file
+
+Using Docker:
+```bash
+docker run --rm -v "$PWD:/work" redocly/cli lint /work/docs/openapi.yaml
+```
+
+Using npm:
+```bash
+npx @redocly/cli lint docs/openapi.yaml
 ```
 
 ---

@@ -1,0 +1,996 @@
+openapi: 3.0.3
+
+info:
+  title: Dabir API
+  description: |
+    Dabir is an open-source letter numbering and registry backend built with Go and PostgreSQL.
+
+    It provides APIs for:
+    - Initial setup
+    - Authentication
+    - User management
+    - Letter management
+    - Audit logs
+    - Public settings
+  version: 0.1.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Health and readiness endpoints
+  - name: Setup
+    description: Initial setup wizard
+  - name: Settings
+    description: Public application settings
+  - name: Auth
+    description: Authentication endpoints
+  - name: Users
+    description: User management endpoints
+  - name: Letters
+    description: Letter registry endpoints
+  - name: Audit Logs
+    description: Audit log endpoints
+
+security:
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      tags:
+        - Health
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: Application is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /readyz:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      security: []
+      responses:
+        "200":
+          description: Application is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadyResponse"
+        "503":
+          description: Application is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/setup/status:
+    get:
+      tags:
+        - Setup
+      summary: Get setup status
+      security: []
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatusResponse"
+
+  /api/v1/setup/initialize:
+    post:
+      tags:
+        - Setup
+      summary: Initialize application
+      description: Creates the initial superuser and stores initial application settings. Can only be executed once.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitializeRequest"
+      responses:
+        "201":
+          description: Application initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InitializeResponse"
+        "409":
+          description: Application already initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/settings/public:
+    get:
+      tags:
+        - Settings
+      summary: Get public settings
+      security: []
+      responses:
+        "200":
+          description: Public settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicSettingsResponse"
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Inactive user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/users:
+    get:
+      tags:
+        - Users
+      summary: List users
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum:
+              - superuser
+              - editor
+              - readonly
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUsersResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Users
+      summary: Create user
+      description: Requires superuser role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "409":
+          description: Username already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      tags:
+        - Users
+      summary: Update user
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/users/{id}/deactivate:
+    patch:
+      tags:
+        - Users
+      summary: Deactivate user
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanActionResponse"
+
+  /api/v1/users/{id}/activate:
+    patch:
+      tags:
+        - Users
+      summary: Activate user
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: User activated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanActionResponse"
+
+  /api/v1/letters:
+    get:
+      tags:
+        - Letters
+      summary: List letters
+      description: Requires superuser, editor, or readonly role.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: destination
+          in: query
+          schema:
+            type: string
+        - name: registrar_name
+          in: query
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: include_deleted
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Letters list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLettersResponse"
+
+    post:
+      tags:
+        - Letters
+      summary: Create letter
+      description: Requires superuser or editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLetterRequest"
+      responses:
+        "201":
+          description: Letter created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/letters/{id}:
+    get:
+      tags:
+        - Letters
+      summary: Get letter by ID
+      description: Requires superuser, editor, or readonly role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Letter details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterResponse"
+        "404":
+          description: Letter not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      tags:
+        - Letters
+      summary: Update letter
+      description: Requires superuser or editor role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLetterRequest"
+      responses:
+        "200":
+          description: Letter updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterResponse"
+
+    delete:
+      tags:
+        - Letters
+      summary: Soft delete letter
+      description: Requires superuser or editor role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Letter deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanActionResponse"
+
+  /api/v1/audit-logs:
+    get:
+      tags:
+        - Audit Logs
+      summary: List audit logs
+      description: Requires superuser role.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: entity_type
+          in: query
+          schema:
+            type: string
+        - name: actor_user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Audit logs list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAuditLogsResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+  schemas:
+    APIError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: "#/components/schemas/APIError"
+
+    HealthData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ReadyData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ready
+        database:
+          type: string
+          example: ok
+
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/HealthData"
+
+    ReadyResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/ReadyData"
+
+    SetupStatus:
+      type: object
+      properties:
+        initialized:
+          type: boolean
+        setup_needed:
+          type: boolean
+
+    SetupStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/SetupStatus"
+
+    InitializeRequest:
+      type: object
+      required:
+        - organization_name
+        - superuser
+        - letter_config
+      properties:
+        organization_name:
+          type: string
+          example: Dabir
+        superuser:
+          type: object
+          required:
+            - username
+            - full_name
+            - password
+          properties:
+            username:
+              type: string
+              example: admin
+            full_name:
+              type: string
+              example: System Administrator
+            password:
+              type: string
+              format: password
+              example: Admin123456!
+        letter_config:
+          type: object
+          required:
+            - number_prefix
+            - number_padding
+          properties:
+            number_prefix:
+              type: string
+              example: DABIR
+            number_padding:
+              type: integer
+              example: 6
+
+    InitializeData:
+      type: object
+      properties:
+        initialized:
+          type: boolean
+        user_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+
+    InitializeResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/InitializeData"
+
+    PublicSettings:
+      type: object
+      properties:
+        organization_name:
+          type: string
+        letter_config:
+          type: object
+          properties:
+            number_prefix:
+              type: string
+            number_padding:
+              type: integer
+
+    PublicSettingsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/PublicSettings"
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: Admin123456!
+
+    LoginUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        full_name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+
+    LoginData:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: "#/components/schemas/LoginUser"
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/LoginData"
+
+    Role:
+      type: string
+      enum:
+        - superuser
+        - editor
+        - readonly
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        full_name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/User"
+
+    MeResponse:
+      $ref: "#/components/schemas/UserResponse"
+
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - full_name
+        - password
+        - role
+      properties:
+        username:
+          type: string
+        full_name:
+          type: string
+        password:
+          type: string
+          format: password
+        role:
+          $ref: "#/components/schemas/Role"
+
+    UpdateUserRequest:
+      type: object
+      required:
+        - full_name
+        - role
+      properties:
+        full_name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        is_active:
+          type: boolean
+
+    ListUsersData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+
+    ListUsersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/ListUsersData"
+
+    Letter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        letter_number:
+          type: integer
+          format: int64
+        formatted_letter_number:
+          type: string
+          example: DABIR-000001
+        title:
+          type: string
+        letter_date:
+          type: string
+          format: date
+        registrar_name:
+          type: string
+        destination:
+          type: string
+        description:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        updated_by:
+          type: string
+          format: uuid
+          nullable: true
+        deleted_by:
+          type: string
+          format: uuid
+          nullable: true
+        is_deleted:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateLetterRequest:
+      type: object
+      required:
+        - title
+        - letter_date
+        - registrar_name
+        - destination
+      properties:
+        title:
+          type: string
+        letter_date:
+          type: string
+          format: date
+        registrar_name:
+          type: string
+        destination:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    UpdateLetterRequest:
+      $ref: "#/components/schemas/CreateLetterRequest"
+
+    LetterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/Letter"
+
+    ListLettersData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Letter"
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+
+    ListLettersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/ListLettersData"
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        old_value:
+          type: object
+          nullable: true
+        new_value:
+          type: object
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ListAuditLogsData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+
+    ListAuditLogsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/ListAuditLogsData"
+
+    BooleanActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          additionalProperties:
+            type: boolean

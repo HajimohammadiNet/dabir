@@ -22,6 +22,10 @@ type AppConfig struct {
 	Env  string `env:"APP_ENV" envDefault:"development"`
 	Host string `env:"APP_HOST" envDefault:"0.0.0.0"`
 	Port int    `env:"APP_PORT" envDefault:"8080"`
+
+	CORSAllowedOrigins string `env:"CORS_ALLOWED_ORIGINS" envDefault:"*"`
+	CORSAllowedMethods string `env:"CORS_ALLOWED_METHODS" envDefault:"GET,POST,PATCH,DELETE,OPTIONS"`
+	CORSAllowedHeaders string `env:"CORS_ALLOWED_HEADERS" envDefault:"Accept,Authorization,Content-Type,X-CSRF-Token,X-Request-ID"`
 }
 
 type DatabaseConfig struct {

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -21,8 +22,14 @@ import (
 	"github.com/hajimohammadinet/dabir/internal/infrastructure/security"
 )
 
-func NewRouter(db *pgxpool.Pool, cfg *config.Config) http.Handler {
+func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.Handler {
 	r := chi.NewRouter()
+
+	r.Use(httpmiddleware.RequestID)
+	r.Use(httpmiddleware.Recoverer(logger))
+	r.Use(httpmiddleware.RequestLogger(logger))
+	r.Use(httpmiddleware.SecurityHeaders)
+	r.Use(httpmiddleware.CORS(cfg.App))
 
 	healthHandler := handlers.NewHealthHandler(db)
 

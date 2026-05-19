@@ -88,6 +88,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 
 	previewLettersImportUseCase := importsapp.NewPreviewLettersImportUseCase(
 		importRepo,
+		letterRepo,
 		letterExcelParser,
 		auditLogger,
 	)

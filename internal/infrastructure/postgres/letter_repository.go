@@ -412,3 +412,38 @@ func (r *LetterRepository) SetSequenceValue(ctx context.Context, value int64) er
 
 	return nil
 }
+
+func (r *LetterRepository) FindExistingNumbers(ctx context.Context, numbers []int64) (map[int64]bool, error) {
+	existing := make(map[int64]bool)
+
+	if len(numbers) == 0 {
+		return existing, nil
+	}
+
+	const query = `
+		SELECT letter_number
+		FROM letters
+		WHERE letter_number = ANY($1)
+	`
+
+	rows, err := r.db.Query(ctx, query, numbers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find existing letter numbers: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var number int64
+		if err := rows.Scan(&number); err != nil {
+			return nil, fmt.Errorf("failed to scan existing letter number: %w", err)
+		}
+
+		existing[number] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate existing letter numbers: %w", err)
+	}
+
+	return existing, nil
+}

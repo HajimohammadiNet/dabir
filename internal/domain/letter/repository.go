@@ -17,6 +17,7 @@ type Repository interface {
 	SoftDelete(ctx context.Context, id string, deletedBy string) error
 
 	SetSequenceValue(ctx context.Context, value int64) error
+	FindExistingNumbers(ctx context.Context, numbers []int64) (map[int64]bool, error)
 }
 
 type ListFilter struct {

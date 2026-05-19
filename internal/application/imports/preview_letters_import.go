@@ -9,10 +9,12 @@ import (
 	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
 	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
 	"github.com/hajimohammadinet/dabir/internal/domain/importjob"
+	"github.com/hajimohammadinet/dabir/internal/domain/letter"
 )
 
 type PreviewLettersImportUseCase struct {
 	importRepo  importjob.Repository
+	letterRepo  letter.Repository
 	parser      *LetterExcelParser
 	auditLogger *auditapp.Logger
 }
@@ -27,11 +29,13 @@ type PreviewLettersImportInput struct {
 
 func NewPreviewLettersImportUseCase(
 	importRepo importjob.Repository,
+	letterRepo letter.Repository,
 	parser *LetterExcelParser,
 	auditLogger *auditapp.Logger,
 ) *PreviewLettersImportUseCase {
 	return &PreviewLettersImportUseCase{
 		importRepo:  importRepo,
+		letterRepo:  letterRepo,
 		parser:      parser,
 		auditLogger: auditLogger,
 	}
@@ -44,6 +48,10 @@ func (uc *PreviewLettersImportUseCase) Execute(ctx context.Context, input Previe
 
 	result, err := uc.parser.Parse(input.FileName, input.FileReader)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := uc.validateDuplicates(ctx, result); err != nil {
 		return nil, err
 	}
 
@@ -104,4 +112,67 @@ func (uc *PreviewLettersImportUseCase) Execute(ctx context.Context, input Previe
 	dto := ToImportJobDTO(*job)
 
 	return &dto, nil
+}
+
+func (uc *PreviewLettersImportUseCase) validateDuplicates(ctx context.Context, result *ParseLettersResult) error {
+	seen := make(map[int64]int)
+	numbers := make([]int64, 0, len(result.Rows))
+
+	validRows := make([]ImportedLetterRow, 0, len(result.Rows))
+	invalidRowNumbers := collectInvalidRows(result.Errors)
+
+	for _, row := range result.Rows {
+		if firstRow, exists := seen[row.LetterNumber]; exists {
+			result.Errors = append(result.Errors, ImportErrorDTO{
+				Row:     row.RowNumber,
+				Field:   "letter_number",
+				Message: fmt.Sprintf("duplicate letter number in file, first seen at row %d", firstRow),
+			})
+			invalidRowNumbers[row.RowNumber] = true
+			continue
+		}
+
+		seen[row.LetterNumber] = row.RowNumber
+		numbers = append(numbers, row.LetterNumber)
+		validRows = append(validRows, row)
+	}
+
+	existingNumbers, err := uc.letterRepo.FindExistingNumbers(ctx, numbers)
+	if err != nil {
+		return err
+	}
+
+	finalRows := make([]ImportedLetterRow, 0, len(validRows))
+
+	for _, row := range validRows {
+		if existingNumbers[row.LetterNumber] {
+			result.Errors = append(result.Errors, ImportErrorDTO{
+				Row:     row.RowNumber,
+				Field:   "letter_number",
+				Message: "letter number already exists in database",
+			})
+			invalidRowNumbers[row.RowNumber] = true
+			continue
+		}
+
+		finalRows = append(finalRows, row)
+	}
+
+	result.Rows = finalRows
+	result.ValidRows = len(finalRows)
+	result.InvalidRows = len(invalidRowNumbers)
+
+	return nil
+}
+
+func collectInvalidRows(errorsList []ImportErrorDTO) map[int]bool {
+	rows := make(map[int]bool)
+
+	for _, errItem := range errorsList {
+		if errItem.Row > 0 {
+			rows[errItem.Row] = true
+		}
+	}
+
+	return rows
 }

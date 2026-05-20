@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/lib/i18n/i18n-context";
 import type { Role } from "@/types/auth";
 
 type ProtectedRouteProps = {
@@ -17,6 +18,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const { user, loading, isAuthenticated } = useAuth();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -27,7 +29,7 @@ export function ProtectedRoute({
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
-        Loading...
+        {t.commonLoading}
       </div>
     );
   }
@@ -40,9 +42,9 @@ export function ProtectedRoute({
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="rounded-lg border bg-background p-6 text-center">
-          <h1 className="text-xl font-semibold">Access denied</h1>
+          <h1 className="text-xl font-semibold">{t.commonAccessDenied}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            You do not have permission to access this page.
+            {t.commonPermissionDenied}
           </p>
         </div>
       </div>

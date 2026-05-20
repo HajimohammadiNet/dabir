@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { login } from "@/lib/api/auth";
 import { getSetupStatus } from "@/lib/api/setup";
 import { useAuth } from "@/contexts/auth-context";
+import { useI18n } from "@/lib/i18n/i18n-context";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const { setSession, isAuthenticated, loading: authLoading } = useAuth();
 
@@ -84,10 +86,8 @@ export default function LoginPage() {
     <main className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Dabir</CardTitle>
-          <CardDescription>
-            Sign in to manage letters and registry numbers.
-          </CardDescription>
+          <CardTitle>{t.appName}</CardTitle>
+          <CardDescription>{t.loginDescription}</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -99,7 +99,7 @@ export default function LoginPage() {
             ) : null}
 
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t.username}</Label>
               <Input
                 id="username"
                 autoComplete="username"
@@ -110,7 +110,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t.password}</Label>
               <Input
                 id="password"
                 type="password"
@@ -122,7 +122,7 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in..." : "Sign in"}
+              {submitting ? t.signingIn : t.signIn}
             </Button>
           </form>
         </CardContent>

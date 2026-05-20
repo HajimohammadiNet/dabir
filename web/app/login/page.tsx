@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { login } from "@/lib/api/auth";
+import { getSetupStatus } from "@/lib/api/setup";
 import { useAuth } from "@/contexts/auth-context";
 
 import { Button } from "@/components/ui/button";
@@ -20,18 +21,45 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setSession } = useAuth();
+  const { setSession, isAuthenticated, loading: authLoading } = useAuth();
 
+  const [checkingSetup, setCheckingSetup] = useState(true);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("Admin123456!");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function checkSetup() {
+      try {
+        const status = await getSetupStatus();
+
+        if (status.setup_needed) {
+          router.replace("/setup");
+          return;
+        }
+      } catch {
+        // If the API is unreachable, keep the user on login page
+        // and show the normal login form.
+      } finally {
+        setCheckingSetup(false);
+      }
+    }
+
+    void checkSetup();
+  }, [router]);
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setError("");
-    setLoading(true);
+    setSubmitting(true);
 
     try {
       const result = await login(username, password);
@@ -40,8 +68,16 @@ export default function LoginPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
+  }
+
+  if (checkingSetup || authLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+        Loading...
+      </main>
+    );
   }
 
   return (
@@ -69,6 +105,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
+                required
               />
             </div>
 
@@ -80,11 +117,12 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                required
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Signing in..." : "Sign in"}
             </Button>
           </form>
         </CardContent>

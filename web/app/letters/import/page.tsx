@@ -10,6 +10,7 @@ import {
   commitLettersImport,
   previewLettersImport,
 } from "@/lib/api/imports";
+import { useI18n } from "@/lib/i18n/i18n-context";
 import type { ImportJob } from "@/types/import";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ImportLettersPage() {
   const { token } = useAuth();
+  const { t } = useI18n();
 
   const [file, setFile] = useState<File | null>(null);
   const [importJob, setImportJob] = useState<ImportJob | null>(null);
@@ -105,20 +107,17 @@ export default function ImportLettersPage() {
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Import Letters
+              {t.importLetters}
             </h1>
             <p className="text-muted-foreground">
-              Import existing letter records from an Excel file.
+              {t.importLettersDescription}
             </p>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Upload Excel File</CardTitle>
-              <CardDescription>
-                Supported format: .xlsx. Required columns: letter number, title,
-                date, sender, receiver.
-              </CardDescription>
+              <CardTitle>{t.uploadExcelFile}</CardTitle>
+              <CardDescription>{t.uploadExcelDescription}</CardDescription>
             </CardHeader>
 
             <CardContent>
@@ -133,7 +132,7 @@ export default function ImportLettersPage() {
                 />
 
                 <Button type="submit" disabled={previewLoading}>
-                  {previewLoading ? "Previewing..." : "Preview Import"}
+                  {previewLoading ? t.previewing : t.previewImport}
                 </Button>
               </form>
             </CardContent>
@@ -143,13 +142,13 @@ export default function ImportLettersPage() {
             <>
               <Card>
                 <CardHeader>
-                  <CardTitle>Import Summary</CardTitle>
+                  <CardTitle>{t.importSummary}</CardTitle>
                   <CardDescription>{importJob.file_name}</CardDescription>
                 </CardHeader>
 
                 <CardContent>
                   <div className="grid gap-4 md:grid-cols-5">
-                    <SummaryItem label="Status">
+                    <SummaryItem label={t.commonStatus}>
                       <Badge
                         variant={
                           importJob.status === "committed"
@@ -161,19 +160,19 @@ export default function ImportLettersPage() {
                       </Badge>
                     </SummaryItem>
 
-                    <SummaryItem label="Total Rows">
+                    <SummaryItem label={t.totalRows}>
                       {importJob.total_rows}
                     </SummaryItem>
 
-                    <SummaryItem label="Valid Rows">
+                    <SummaryItem label={t.validRows}>
                       {importJob.valid_rows}
                     </SummaryItem>
 
-                    <SummaryItem label="Invalid Rows">
+                    <SummaryItem label={t.invalidRows}>
                       {importJob.invalid_rows}
                     </SummaryItem>
 
-                    <SummaryItem label="Max Number">
+                    <SummaryItem label={t.maxNumber}>
                       {importJob.max_letter_number || "-"}
                     </SummaryItem>
                   </div>
@@ -183,7 +182,7 @@ export default function ImportLettersPage() {
                       onClick={handleCommit}
                       disabled={!canCommit || commitLoading}
                     >
-                      {commitLoading ? "Committing..." : "Commit Import"}
+                      {commitLoading ? t.committing : t.commitImport}
                     </Button>
 
                     {!canCommit && importJob.status === "previewed" ? (
@@ -225,6 +224,8 @@ function SummaryItem({
 }
 
 function DetectedColumnsCard({ importJob }: { importJob: ImportJob }) {
+  const { t } = useI18n();
+
   const columns = importJob.detected_columns || {};
   const entries = Object.entries(columns);
 
@@ -235,7 +236,7 @@ function DetectedColumnsCard({ importJob }: { importJob: ImportJob }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Detected Columns</CardTitle>
+        <CardTitle>{t.detectedColumns}</CardTitle>
       </CardHeader>
 
       <CardContent>
@@ -243,8 +244,8 @@ function DetectedColumnsCard({ importJob }: { importJob: ImportJob }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Field</TableHead>
-                <TableHead>Detected Column</TableHead>
+                <TableHead>{t.field}</TableHead>
+                <TableHead>{t.detectedColumn}</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -264,15 +265,15 @@ function DetectedColumnsCard({ importJob }: { importJob: ImportJob }) {
 }
 
 function ImportErrorsCard({ importJob }: { importJob: ImportJob }) {
+  const { t } = useI18n();
+
   const errors = importJob.errors || [];
 
   if (errors.length === 0) {
     return (
       <Alert>
-        <AlertTitle>No errors found</AlertTitle>
-        <AlertDescription>
-          The uploaded file is valid and ready to be committed.
-        </AlertDescription>
+        <AlertTitle>{t.noErrorsFound}</AlertTitle>
+        <AlertDescription>{t.importReady}</AlertDescription>
       </Alert>
     );
   }
@@ -280,10 +281,8 @@ function ImportErrorsCard({ importJob }: { importJob: ImportJob }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Import Errors</CardTitle>
-        <CardDescription>
-          Fix these rows in Excel and upload again, or use a corrected file.
-        </CardDescription>
+        <CardTitle>{t.importErrors}</CardTitle>
+        <CardDescription>{t.importErrorsDescription}</CardDescription>
       </CardHeader>
 
       <CardContent>
@@ -291,9 +290,9 @@ function ImportErrorsCard({ importJob }: { importJob: ImportJob }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Row</TableHead>
-                <TableHead>Field</TableHead>
-                <TableHead>Message</TableHead>
+                <TableHead>{t.excelRow}</TableHead>
+                <TableHead>{t.field}</TableHead>
+                <TableHead>{t.description}</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -314,15 +313,15 @@ function ImportErrorsCard({ importJob }: { importJob: ImportJob }) {
 }
 
 function PreviewRowsCard({ importJob }: { importJob: ImportJob }) {
+  const { t } = useI18n();
+
   const rows = importJob.preview_data || [];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Preview Rows</CardTitle>
-        <CardDescription>
-          Only valid rows are shown here and will be imported after commit.
-        </CardDescription>
+        <CardTitle>{t.previewRows}</CardTitle>
+        <CardDescription>{t.previewRowsDescription}</CardDescription>
       </CardHeader>
 
       <CardContent>
@@ -330,12 +329,12 @@ function PreviewRowsCard({ importJob }: { importJob: ImportJob }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Excel Row</TableHead>
-                <TableHead>Number</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Sender</TableHead>
-                <TableHead>Receiver</TableHead>
+                <TableHead>{t.excelRow}</TableHead>
+                <TableHead>{t.number}</TableHead>
+                <TableHead>{t.letterTitle}</TableHead>
+                <TableHead>{t.letterDate}</TableHead>
+                <TableHead>{t.sender}</TableHead>
+                <TableHead>{t.receiver}</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -346,7 +345,7 @@ function PreviewRowsCard({ importJob }: { importJob: ImportJob }) {
                     colSpan={6}
                     className="text-center text-muted-foreground"
                   >
-                    No valid rows found.
+                    {t.noValidRowsFound}
                   </TableCell>
                 </TableRow>
               ) : (

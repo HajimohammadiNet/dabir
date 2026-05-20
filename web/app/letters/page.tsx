@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/contexts/auth-context";
 import { listLetters } from "@/lib/api/letters";
+import { useI18n } from "@/lib/i18n/i18n-context";
 import type { Letter } from "@/types/letter";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
 
 export default function LettersPage() {
   const { token, user } = useAuth();
+  const { t } = useI18n();
 
   const [letters, setLetters] = useState<Letter[]>([]);
   const [search, setSearch] = useState("");
@@ -71,22 +73,24 @@ export default function LettersPage() {
         <div className="space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Letters</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {t.letters}
+              </h1>
               <p className="text-muted-foreground">
-                Manage registered letters and numbering.
+                {t.lettersDescription}
               </p>
             </div>
 
             {canCreate ? (
-                <Link href="/letters/new">
-                    <Button>New Letter</Button>
-                </Link>
-                ) : null}
+              <Link href="/letters/new">
+                <Button>{t.newLetter}</Button>
+              </Link>
+            ) : null}
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Search</CardTitle>
+              <CardTitle>{t.commonSearch}</CardTitle>
             </CardHeader>
             <CardContent>
               <form
@@ -97,12 +101,12 @@ export default function LettersPage() {
                 }}
               >
                 <Input
-                  placeholder="Search by title, sender, receiver, number..."
+                  placeholder={t.searchLettersPlaceholder}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Loading..." : "Search"}
+                  {loading ? t.commonLoading : t.commonSearch}
                 </Button>
               </form>
             </CardContent>
@@ -110,20 +114,20 @@ export default function LettersPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Letters List</CardTitle>
+              <CardTitle>{t.letters}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Number</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Sender</TableHead>
-                      <TableHead>Receiver</TableHead>
-                      <TableHead>Registrar</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{t.number}</TableHead>
+                      <TableHead>{t.letterTitle}</TableHead>
+                      <TableHead>{t.letterDate}</TableHead>
+                      <TableHead>{t.sender}</TableHead>
+                      <TableHead>{t.receiver}</TableHead>
+                      <TableHead>{t.registrar}</TableHead>
+                      <TableHead>{t.commonStatus}</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -134,7 +138,7 @@ export default function LettersPage() {
                           colSpan={7}
                           className="text-center text-muted-foreground"
                         >
-                          {loading ? "Loading..." : "No letters found."}
+                          {loading ? t.commonLoading : t.noLettersFound}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -150,9 +154,13 @@ export default function LettersPage() {
                           <TableCell>{letter.registrar_name}</TableCell>
                           <TableCell>
                             {letter.is_deleted ? (
-                              <Badge variant="destructive">Deleted</Badge>
+                              <Badge variant="destructive">
+                                {t.commonDeleted}
+                              </Badge>
                             ) : (
-                              <Badge variant="secondary">Active</Badge>
+                              <Badge variant="secondary">
+                                {t.commonActive}
+                              </Badge>
                             )}
                           </TableCell>
                         </TableRow>

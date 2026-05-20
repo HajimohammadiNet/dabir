@@ -24,6 +24,11 @@ const navItems: NavItem[] = [
     roles: ["superuser", "editor", "readonly"],
   },
   {
+    href: "/profile/change-password",
+    labelKey: "changePassword",
+    roles: ["superuser", "editor", "readonly"],
+  },
+  {
     href: "/letters",
     labelKey: "letters",
     roles: ["superuser", "editor", "readonly"],

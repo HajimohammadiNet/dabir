@@ -186,16 +186,24 @@ export default function UsersPage() {
                           <TableCell>
                             {new Date(user.created_at).toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={actionLoadingUserID === user.id}
-                              onClick={() => void handleToggleActive(user)}
-                            >
-                              {user.is_active ? "Deactivate" : "Activate"}
-                            </Button>
-                          </TableCell>
+                          <TableCell className="text-end">
+                                <div className="flex justify-end gap-2">
+                                    <Link href={`/users/${user.id}/reset-password`}>
+                                    <Button variant="outline" size="sm">
+                                        Reset Password
+                                    </Button>
+                                    </Link>
+
+                                    <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={actionLoadingUserID === user.id}
+                                    onClick={() => void handleToggleActive(user)}
+                                    >
+                                    {user.is_active ? "Deactivate" : "Activate"}
+                                    </Button>
+                                </div>
+                            </TableCell>
                         </TableRow>
                       ))
                     )}

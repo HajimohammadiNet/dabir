@@ -67,3 +67,17 @@ export async function deactivateUser(token: string, id: string) {
     token
   );
 }
+
+export async function resetUserPassword(
+  token: string,
+  id: string,
+  newPassword: string
+) {
+  return apiClient.post<{ reset: boolean }>(
+    `/users/${id}/reset-password`,
+    {
+      new_password: newPassword,
+    },
+    token
+  );
+}

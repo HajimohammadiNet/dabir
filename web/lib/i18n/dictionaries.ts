@@ -16,6 +16,11 @@ export const dictionaries = {
     logout: "Logout",
     newLetter: "New Letter",
     newUser: "New User",
+    changePassword: "Change Password",
+    currentPassword: "Current Password",
+    newPassword: "New Password",
+    confirmPassword: "Confirm Password",
+    resetPassword: "Reset Password",
   },
   fa: {
     appName: "دبیر",
@@ -32,5 +37,10 @@ export const dictionaries = {
     logout: "خروج",
     newLetter: "نامه جدید",
     newUser: "کاربر جدید",
+    changePassword: "تغییر رمز عبور",
+    currentPassword: "رمز عبور فعلی",
+    newPassword: "رمز عبور جدید",
+    confirmPassword: "تکرار رمز عبور",
+    resetPassword: "بازنشانی رمز عبور",
   },
 } as const;

@@ -162,14 +162,13 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 				r.Use(httpmiddleware.AuthMiddleware(jwtService))
 
 				r.Get("/me", authHandler.Me)
+				r.Post("/change-password", authHandler.ChangePassword)
 
 				r.With(httpmiddleware.RequireRoles(user.RoleSuperUser)).
 					Get("/superuser-check", func(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusNoContent)
 					})
 			})
-
-			r.Post("/change-password", authHandler.ChangePassword)
 		})
 
 		r.Route("/users", func(r chi.Router) {

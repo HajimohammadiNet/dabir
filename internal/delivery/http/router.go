@@ -64,13 +64,27 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 		auditLogger,
 	)
 	meUseCase := authapp.NewMeUseCase(userRepo)
-	authHandler := handlers.NewAuthHandler(loginUseCase, meUseCase)
+
+	changePasswordUseCase := authapp.NewChangePasswordUseCase(
+		userRepo,
+		passwordHasher,
+		passwordHasher,
+	)
+
+	authHandler := handlers.NewAuthHandler(
+		loginUseCase,
+		meUseCase,
+		changePasswordUseCase,
+		auditLogger,
+	)
 
 	createUserUseCase := usersapp.NewCreateUserUseCase(userRepo, passwordHasher)
 	listUsersUseCase := usersapp.NewListUsersUseCase(userRepo)
 	getUserUseCase := usersapp.NewGetUserUseCase(userRepo)
 	updateUserUseCase := usersapp.NewUpdateUserUseCase(userRepo)
 	setUserActiveUseCase := usersapp.NewSetUserActiveUseCase(userRepo)
+
+	resetPasswordUseCase := usersapp.NewResetPasswordUseCase(userRepo, passwordHasher)
 
 	userHandler := handlers.NewUserHandler(
 		createUserUseCase,
@@ -79,6 +93,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 		updateUserUseCase,
 		setUserActiveUseCase,
 		auditLogger,
+		resetPasswordUseCase,
 	)
 
 	letterRepo := postgres.NewLetterRepository(db)
@@ -153,6 +168,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 						w.WriteHeader(http.StatusNoContent)
 					})
 			})
+
+			r.Post("/change-password", authHandler.ChangePassword)
 		})
 
 		r.Route("/users", func(r chi.Router) {
@@ -165,6 +182,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 			r.Patch("/{id}", userHandler.Update)
 			r.Patch("/{id}/deactivate", userHandler.Deactivate)
 			r.Patch("/{id}/activate", userHandler.Activate)
+			r.Post("/{id}/reset-password", userHandler.ResetPassword)
 		})
 
 		r.Route("/letters", func(r chi.Router) {

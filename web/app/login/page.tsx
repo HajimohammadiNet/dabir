@@ -24,8 +24,8 @@ export default function LoginPage() {
   const { setSession, isAuthenticated, loading: authLoading } = useAuth();
 
   const [checkingSetup, setCheckingSetup] = useState(true);
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("Admin123456!");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 

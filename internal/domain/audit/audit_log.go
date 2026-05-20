@@ -25,10 +25,12 @@ const (
 	ActionAuthLoginSuccess = "auth.login_success"
 	ActionAuthLoginFailed  = "auth.login_failed"
 
-	ActionUserCreated     = "user.created"
-	ActionUserUpdated     = "user.updated"
-	ActionUserActivated   = "user.activated"
-	ActionUserDeactivated = "user.deactivated"
+	ActionUserCreated         = "user.created"
+	ActionUserUpdated         = "user.updated"
+	ActionUserActivated       = "user.activated"
+	ActionUserDeactivated     = "user.deactivated"
+	ActionUserPasswordChanged = "user.password_changed"
+	ActionUserPasswordReset   = "user.password_reset"
 
 	ActionLetterCreated = "letter.created"
 	ActionLetterUpdated = "letter.updated"

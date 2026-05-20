@@ -5,43 +5,47 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { LanguageToggle } from "@/components/theme/language-toggle";
+import { useI18n } from "@/lib/i18n/i18n-context";
+import { dictionaries } from "@/lib/i18n/dictionaries";
 import type { Role } from "@/types/auth";
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: keyof typeof dictionaries.en;
   roles: Role[];
 };
 
 const navItems: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Dashboard",
+    labelKey: "dashboard",
     roles: ["superuser", "editor", "readonly"],
   },
   {
     href: "/letters",
-    label: "Letters",
+    labelKey: "letters",
     roles: ["superuser", "editor", "readonly"],
   },
   {
     href: "/letters/import",
-    label: "Import",
+    labelKey: "import",
     roles: ["superuser"],
   },
   {
     href: "/users",
-    label: "Users",
+    labelKey: "users",
     roles: ["superuser"],
   },
   {
     href: "/audit-logs",
-    label: "Audit Logs",
+    labelKey: "auditLogs",
     roles: ["superuser"],
   },
   {
     href: "/settings",
-    label: "Settings",
+    labelKey: "settings",
     roles: ["superuser"],
   },
 ];
@@ -49,22 +53,23 @@ const navItems: NavItem[] = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { t, direction } = useI18n();
 
   const visibleNavItems = navItems.filter((item) =>
     user ? item.roles.includes(user.role) : false
   );
 
   return (
-    <div className="min-h-screen bg-muted/40">
+    <div className="min-h-screen bg-muted/40" dir={direction}>
       <header className="border-b bg-background">
-        <div className="h-16 px-6 flex items-center justify-between">
+        <div className="h-16 px-6 flex items-center justify-between gap-4">
           <Link href="/dashboard" className="font-semibold text-lg">
-            Dabir
+            {t.appName}
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {user ? (
-              <div className="text-right">
+              <div className="text-end">
                 <div className="text-sm font-medium">{user.full_name}</div>
                 <div className="text-xs text-muted-foreground">
                   {user.username} · {user.role}
@@ -72,15 +77,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
 
+            <LanguageToggle />
+            <ThemeToggle />
+
             <Button variant="outline" onClick={logout}>
-              Logout
+              {t.logout}
             </Button>
           </div>
         </div>
       </header>
 
       <div className="flex">
-        <aside className="w-64 border-r min-h-[calc(100vh-4rem)] bg-background p-4">
+        <aside className="w-64 border-e min-h-[calc(100vh-4rem)] bg-background p-4">
           <nav className="space-y-1">
             {visibleNavItems.map((item) => {
               const active =
@@ -94,11 +102,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className={[
                     "block rounded-md px-3 py-2 text-sm transition-colors",
                     active
-                      ? "bg-muted font-medium"
-                      : "hover:bg-muted text-muted-foreground hover:text-foreground",
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   ].join(" ")}
                 >
-                  {item.label}
+                  {t[item.labelKey]}
                 </Link>
               );
             })}

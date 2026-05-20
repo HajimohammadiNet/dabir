@@ -24,6 +24,7 @@ type UserHandler struct {
 	updateUserUseCase    *usersapp.UpdateUserUseCase
 	setUserActiveUseCase *usersapp.SetUserActiveUseCase
 	auditLogger          *auditapp.Logger
+	resetPasswordUseCase *usersapp.ResetPasswordUseCase
 }
 
 func NewUserHandler(
@@ -33,6 +34,7 @@ func NewUserHandler(
 	updateUserUseCase *usersapp.UpdateUserUseCase,
 	setUserActiveUseCase *usersapp.SetUserActiveUseCase,
 	auditLogger *auditapp.Logger,
+	resetPasswordUseCase *usersapp.ResetPasswordUseCase,
 ) *UserHandler {
 	return &UserHandler{
 		createUserUseCase:    createUserUseCase,
@@ -41,6 +43,7 @@ func NewUserHandler(
 		updateUserUseCase:    updateUserUseCase,
 		setUserActiveUseCase: setUserActiveUseCase,
 		auditLogger:          auditLogger,
+		resetPasswordUseCase: resetPasswordUseCase,
 	}
 }
 
@@ -260,4 +263,51 @@ func parseIntQuery(value string, defaultValue int) int {
 	}
 
 	return parsed
+}
+
+func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	authUser, _ := middleware.GetAuthUser(r.Context())
+	id := chi.URLParam(r, "id")
+
+	var input usersapp.ResetPasswordInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.Error(w, http.StatusBadRequest, "INVALID_REQUEST_BODY", "invalid request body")
+		return
+	}
+
+	input.UserID = id
+
+	err := h.resetPasswordUseCase.Execute(r.Context(), input)
+	if err != nil {
+		switch {
+		case errors.Is(err, usersapp.ErrUserNotFound):
+			response.Error(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
+		case errors.Is(err, usersapp.ErrWeakPassword):
+			response.Error(w, http.StatusBadRequest, "WEAK_PASSWORD", "password must be at least 8 characters")
+		default:
+			response.Error(w, http.StatusBadRequest, "RESET_PASSWORD_FAILED", err.Error())
+		}
+		return
+	}
+
+	if h.auditLogger != nil {
+		actorID := authUser.ID
+		entityID := id
+
+		h.auditLogger.Log(r.Context(), auditapp.LogInput{
+			ActorUserID: &actorID,
+			Action:      domainaudit.ActionUserPasswordReset,
+			EntityType:  "user",
+			EntityID:    &entityID,
+			IPAddress:   requestIP(r),
+			UserAgent:   requestUserAgent(r),
+			NewValue: map[string]interface{}{
+				"reset": true,
+			},
+		})
+	}
+
+	response.JSON(w, http.StatusOK, map[string]bool{
+		"reset": true,
+	})
 }

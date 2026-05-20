@@ -1,0 +1,36 @@
+export type Locale = "fa" | "en";
+
+export const dictionaries = {
+  en: {
+    appName: "Dabir",
+    login: "Login",
+    username: "Username",
+    password: "Password",
+    signIn: "Sign in",
+    dashboard: "Dashboard",
+    letters: "Letters",
+    import: "Import",
+    users: "Users",
+    auditLogs: "Audit Logs",
+    settings: "Settings",
+    logout: "Logout",
+    newLetter: "New Letter",
+    newUser: "New User",
+  },
+  fa: {
+    appName: "دبیر",
+    login: "ورود",
+    username: "نام کاربری",
+    password: "رمز عبور",
+    signIn: "ورود",
+    dashboard: "داشبورد",
+    letters: "نامه‌ها",
+    import: "ایمپورت",
+    users: "کاربران",
+    auditLogs: "گزارش فعالیت‌ها",
+    settings: "تنظیمات",
+    logout: "خروج",
+    newLetter: "نامه جدید",
+    newUser: "کاربر جدید",
+  },
+} as const;

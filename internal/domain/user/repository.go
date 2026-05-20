@@ -12,6 +12,7 @@ type Repository interface {
 	List(ctx context.Context, filter ListFilter) ([]User, int, error)
 	Update(ctx context.Context, u *User) error
 	SetActive(ctx context.Context, id string, isActive bool) error
+	UpdatePassword(ctx context.Context, id string, passwordHash string) error
 }
 
 type ListFilter struct {

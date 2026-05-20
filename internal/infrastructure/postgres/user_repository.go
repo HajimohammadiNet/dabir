@@ -299,3 +299,24 @@ func (r *UserRepository) SetActive(ctx context.Context, id string, isActive bool
 
 	return nil
 }
+
+func (r *UserRepository) UpdatePassword(ctx context.Context, id string, passwordHash string) error {
+	const query = `
+		UPDATE users
+		SET
+			password_hash = $1,
+			updated_at = NOW()
+		WHERE id = $2
+	`
+
+	result, err := r.db.Exec(ctx, query, passwordHash, id)
+	if err != nil {
+		return fmt.Errorf("failed to update user password: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}

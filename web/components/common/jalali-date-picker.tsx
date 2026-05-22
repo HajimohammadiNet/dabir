@@ -12,6 +12,12 @@ type JalaliDatePickerProps = {
   id?: string;
 };
 
+function toEnglishDigits(value: string) {
+  return value
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
+}
+
 export function JalaliDatePicker({
   value,
   onChange,
@@ -39,7 +45,7 @@ export function JalaliDatePicker({
         }
 
         const selectedDate = Array.isArray(date) ? date[0] : date;
-        onChange(selectedDate.format("YYYY/MM/DD"));
+        onChange(toEnglishDigits(selectedDate.format("YYYY/MM/DD")));
       }}
       calendar={persian}
       locale={persianFa}

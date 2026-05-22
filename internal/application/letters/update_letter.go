@@ -49,7 +49,7 @@ func (uc *UpdateLetterUseCase) Execute(ctx context.Context, input UpdateLetterIn
 
 	letterDate, err := dateutil.ParseOfficialDate(input.LetterDate)
 	if err != nil {
-		return nil, errors.New("letter_date must be in YYYY-MM-DD format")
+		return nil, errors.New("letter_date must be in Jalali YYYY/MM/DD format")
 	}
 
 	l, err := uc.letterRepo.FindByID(ctx, input.ID)

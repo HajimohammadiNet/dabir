@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/contexts/auth-context";
 import { createUser } from "@/lib/api/users";
+import { useI18n } from "@/lib/i18n/i18n-context";
 import type { Role } from "@/types/auth";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 export default function NewUserPage() {
   const router = useRouter();
   const { token } = useAuth();
+  const { t } = useI18n();
 
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
@@ -59,21 +61,19 @@ export default function NewUserPage() {
       <AppShell>
         <div className="max-w-2xl space-y-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">New User</h1>
-            <p className="text-muted-foreground">
-              Create a new user and assign an access role.
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight">{t.newUser}</h1>
+            <p className="text-muted-foreground">{t.usersDescription}</p>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>User Information</CardTitle>
+              <CardTitle>{t.userInformation}</CardTitle>
             </CardHeader>
 
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">{t.username}</Label>
                   <Input
                     id="username"
                     value={username}
@@ -84,7 +84,7 @@ export default function NewUserPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
+                  <Label htmlFor="full_name">{t.fullName}</Label>
                   <Input
                     id="full_name"
                     value={fullName}
@@ -94,7 +94,7 @@ export default function NewUserPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t.password}</Label>
                   <Input
                     id="password"
                     type="password"
@@ -106,22 +106,22 @@ export default function NewUserPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
+                  <Label htmlFor="role">{t.role}</Label>
                   <select
                     id="role"
                     value={role}
                     onChange={(event) => setRole(event.target.value as Role)}
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   >
-                    <option value="readonly">Readonly</option>
-                    <option value="editor">Editor</option>
-                    <option value="superuser">Superuser</option>
+                    <option value="readonly">{t.readonly}</option>
+                    <option value="editor">{t.editor}</option>
+                    <option value="superuser">{t.superuser}</option>
                   </select>
                 </div>
 
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading}>
-                    {loading ? "Creating..." : "Create User"}
+                    {loading ? t.creatingUser : t.createUser}
                   </Button>
 
                   <Button
@@ -129,7 +129,7 @@ export default function NewUserPage() {
                     variant="outline"
                     onClick={() => router.push("/users")}
                   >
-                    Cancel
+                    {t.commonCancel}
                   </Button>
                 </div>
               </form>

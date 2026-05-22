@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPublicSettings } from "@/lib/api/settings";
+import { useI18n } from "@/lib/i18n/i18n-context";
 import type { PublicSettings } from "@/types/settings";
 
 import {
@@ -19,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
+
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -51,28 +54,30 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {t.settings}
+              </h1>
               <p className="text-muted-foreground">
-                View Dabir application settings.
+                {t.settingsDescription}
               </p>
             </div>
 
             <Button variant="outline" onClick={() => void loadSettings()}>
-              {loading ? "Loading..." : "Refresh"}
+              {loading ? t.commonLoading : t.commonRefresh}
             </Button>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Organization</CardTitle>
+              <CardTitle>{t.organization}</CardTitle>
               <CardDescription>
-                Basic organization information configured during setup.
+                {t.organizationSettingsDescription}
               </CardDescription>
             </CardHeader>
 
             <CardContent>
               <InfoRow
-                label="Organization Name"
+                label={t.organizationName}
                 value={settings?.organization_name || "-"}
               />
             </CardContent>
@@ -80,20 +85,20 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Letter Numbering</CardTitle>
+              <CardTitle>{t.letterNumbering}</CardTitle>
               <CardDescription>
-                Current letter number formatting configuration.
+                {t.letterNumberingDescription}
               </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4">
               <InfoRow
-                label="Number Prefix"
+                label={t.numberPrefix}
                 value={settings?.letter_config.number_prefix || "-"}
               />
 
               <InfoRow
-                label="Number Padding"
+                label={t.numberPadding}
                 value={
                   settings
                     ? String(settings.letter_config.number_padding)
@@ -104,7 +109,7 @@ export default function SettingsPage() {
               {settings ? (
                 <div className="rounded-lg border bg-muted/30 p-4">
                   <div className="text-sm text-muted-foreground">
-                    Example formatted number
+                    {t.exampleFormattedNumber}
                   </div>
                   <div className="mt-2">
                     <Badge variant="secondary" className="text-base">

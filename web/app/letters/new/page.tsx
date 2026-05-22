@@ -29,6 +29,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { JalaliDatePicker } from "@/components/common/jalali-date-picker";
 
 export default function NewLetterPage() {
   const router = useRouter();
@@ -112,14 +113,11 @@ export default function NewLetterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="letter_date">{t.letterDate}</Label>
-                    <Input
+                    <JalaliDatePicker
                         id="letter_date"
-                        type="text"
-                        placeholder="1405/02/30"
                         value={letterDate}
-                        onChange={(event) => setLetterDate(event.target.value)}
+                        onChange={setLetterDate}
                         required
-                        dir="ltr"
                     />
                 </div>
 

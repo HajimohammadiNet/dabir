@@ -132,3 +132,130 @@
 body {
   font-family: var(--font-vazirmatn), Arial, sans-serif;
 }
+
+/* Dabir Jalali Date Picker */
+
+.rmdp-container {
+  width: 100%;
+}
+
+.rmdp-input {
+  width: 100% !important;
+  height: 2.5rem !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  background: var(--input) !important;
+  color: var(--foreground) !important;
+  padding: 0 0.875rem !important;
+  font-family: var(--font-vazirmatn), Arial, sans-serif !important;
+  font-size: 0.95rem !important;
+  outline: none !important;
+}
+
+.rmdp-input:focus {
+  border-color: var(--ring) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 30%, transparent) !important;
+}
+
+.rmdp-wrapper {
+  border-radius: 1rem !important;
+  border: 1px solid var(--border) !important;
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 45%) !important;
+  overflow: hidden !important;
+  font-family: var(--font-vazirmatn), Arial, sans-serif !important;
+  z-index: 9999 !important;
+}
+
+.rmdp-calendar,
+.rmdp-day-picker,
+.rmdp-month-picker,
+.rmdp-year-picker {
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+}
+
+.rmdp-calendar {
+  padding: 0.75rem !important;
+}
+
+.rmdp-header {
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.rmdp-header-values {
+  color: var(--popover-foreground) !important;
+  font-weight: 700 !important;
+}
+
+.rmdp-arrow-container {
+  border-radius: 0.5rem !important;
+}
+
+.rmdp-arrow-container:hover {
+  background: var(--muted) !important;
+  box-shadow: none !important;
+}
+
+.rmdp-arrow {
+  border-color: var(--popover-foreground) !important;
+}
+
+.rmdp-week-day {
+  color: var(--muted-foreground) !important;
+  font-weight: 700 !important;
+}
+
+.rmdp-day {
+  color: var(--popover-foreground) !important;
+}
+
+.rmdp-day span {
+  border-radius: 0.55rem !important;
+  color: var(--popover-foreground) !important;
+  background: transparent !important;
+}
+
+.rmdp-day:not(.rmdp-disabled):not(.rmdp-day-hidden) span:hover {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+
+.rmdp-day.rmdp-selected span,
+.rmdp-day.rmdp-selected span:hover {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  box-shadow: none !important;
+}
+
+.rmdp-day.rmdp-today span {
+  border: 1px solid var(--primary) !important;
+  color: var(--primary) !important;
+  background: transparent !important;
+}
+
+.rmdp-day.rmdp-today.rmdp-selected span {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.rmdp-day.rmdp-disabled span,
+.rmdp-day.rmdp-day-hidden span {
+  color: color-mix(in oklab, var(--muted-foreground) 40%, transparent) !important;
+}
+
+.rmdp-ep-arrow {
+  background: var(--popover) !important;
+  border-color: var(--border) !important;
+}
+
+.rmdp-button {
+  color: var(--primary) !important;
+}
+
+.rmdp-button:hover {
+  background: var(--muted) !important;
+}

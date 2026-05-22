@@ -1,0 +1,30 @@
+{{- if .Values.podDisruptionBudget.api.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "dabir.api.name" . }}
+  labels:
+    {{- include "dabir.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.api.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "dabir.api.selectorLabels" . | nindent 6 }}
+{{- end }}
+
+{{- if .Values.podDisruptionBudget.web.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "dabir.web.name" . }}
+  labels:
+    {{- include "dabir.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.web.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "dabir.web.selectorLabels" . | nindent 6 }}
+{{- end }}

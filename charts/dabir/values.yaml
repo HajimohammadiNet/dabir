@@ -1,0 +1,200 @@
+global:
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+api:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/hajimohammadinet/dabir-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  command: []
+  args: []
+
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+
+  env:
+    APP_NAME: dabir
+    APP_ENV: production
+    APP_HOST: 0.0.0.0
+    APP_PORT: "8080"
+
+    DB_HOST: "postgres.example.internal"
+    DB_PORT: "5432"
+    DB_USER: "dabir"
+    DB_NAME: "dabir"
+    DB_SSLMODE: "disable"
+    DB_MAX_OPEN_CONNS: "25"
+    DB_MAX_IDLE_CONNS: "10"
+
+    JWT_ACCESS_TOKEN_TTL_MINUTES: "60"
+
+    CORS_ALLOWED_ORIGINS: "https://dabir.example.com"
+    CORS_ALLOWED_METHODS: "GET,POST,PATCH,DELETE,OPTIONS"
+    CORS_ALLOWED_HEADERS: "Accept,Authorization,Content-Type,X-CSRF-Token,X-Request-ID"
+
+  secrets:
+    create: true
+    existingSecret: ""
+    DB_PASSWORD: "change-this-db-password"
+    JWT_SECRET: "change-this-jwt-secret"
+
+  podAnnotations: {}
+  podLabels: {}
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  livenessProbe:
+    enabled: true
+    path: /healthz
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /readyz
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    capabilities:
+      drop:
+        - ALL
+
+  podSecurityContext:
+    fsGroup: 10001
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+web:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/hajimohammadinet/dabir-web
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+    HOSTNAME: "0.0.0.0"
+    NEXT_PUBLIC_API_BASE_URL: "https://dabir.example.com/api/v1"
+
+  podAnnotations: {}
+  podLabels: {}
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  livenessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    enabled: true
+    path: /
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    capabilities:
+      drop:
+        - ALL
+
+  podSecurityContext:
+    fsGroup: 10001
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+  hosts:
+    - host: dabir.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+        - path: /api
+          pathType: Prefix
+          service: api
+  tls: []
+  # tls:
+  #   - secretName: dabir-tls
+  #     hosts:
+  #       - dabir.example.com
+
+autoscaling:
+  api:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  web:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  api:
+    enabled: true
+    minAvailable: 1
+  web:
+    enabled: true
+    minAvailable: 1

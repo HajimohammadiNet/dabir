@@ -1,0 +1,37 @@
+Dabir has been deployed.
+
+Release:
+  {{ .Release.Name }}
+
+Namespace:
+  {{ .Release.Namespace }}
+
+Services:
+  API:
+    {{ include "dabir.api.name" . }}:{{ .Values.api.service.port }}
+
+  Web:
+    {{ include "dabir.web.name" . }}:{{ .Values.web.service.port }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress hosts:
+{{- range .Values.ingress.hosts }}
+  - {{ .host }}
+{{- end }}
+{{- end }}
+
+Important:
+  PostgreSQL is external and is not deployed by this chart.
+
+Check pods:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Check services:
+  kubectl get svc -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+API logs:
+  kubectl logs -n {{ .Release.Namespace }} deploy/{{ include "dabir.api.name" . }} -f
+
+Web logs:
+  kubectl logs -n {{ .Release.Namespace }} deploy/{{ include "dabir.web.name" . }} -f

@@ -112,14 +112,15 @@ export default function NewLetterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="letter_date">{t.letterDate}</Label>
-                  <Input
-                    id="letter_date"
-                    type="date"
-                    value={letterDate}
-                    onChange={(event) => setLetterDate(event.target.value)}
-                    required
-                    dir="ltr"
-                  />
+                    <Input
+                        id="letter_date"
+                        type="text"
+                        placeholder="1405/02/30"
+                        value={letterDate}
+                        onChange={(event) => setLetterDate(event.target.value)}
+                        required
+                        dir="ltr"
+                    />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -202,7 +203,7 @@ export default function NewLetterPage() {
                     <InfoRow label={t.letterTitle} value={createdLetter.title} />
                     <InfoRow
                       label={t.letterDate}
-                      value={createdLetter.letter_date}
+                      value={createdLetter.letter_date_jalali}
                       forceLtr
                     />
                     <InfoRow label={t.sender} value={createdLetter.sender} />

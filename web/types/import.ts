@@ -9,6 +9,7 @@ export type ImportedLetterRow = {
   letter_number: number;
   title: string;
   letter_date: string;
+  letter_date_jalali?: string;
   sender: string;
   receiver: string;
 };

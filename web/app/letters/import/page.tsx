@@ -354,7 +354,7 @@ function PreviewRowsCard({ importJob }: { importJob: ImportJob }) {
                     <TableCell>{row.row_number}</TableCell>
                     <TableCell>{row.letter_number}</TableCell>
                     <TableCell>{row.title}</TableCell>
-                    <TableCell>{row.letter_date}</TableCell>
+                    <TableCell dir="ltr">{row.letter_date_jalali || row.letter_date}</TableCell>
                     <TableCell>{row.sender}</TableCell>
                     <TableCell>{row.receiver}</TableCell>
                   </TableRow>

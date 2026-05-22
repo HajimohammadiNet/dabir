@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
+	//"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
+	"github.com/hajimohammadinet/dabir/internal/shared/dateutil"
 )
 
 type UpdateLetterUseCase struct {
@@ -46,7 +47,7 @@ func (uc *UpdateLetterUseCase) Execute(ctx context.Context, input UpdateLetterIn
 		return nil, err
 	}
 
-	letterDate, err := time.Parse("2006-01-02", input.LetterDate)
+	letterDate, err := dateutil.ParseOfficialDate(input.LetterDate)
 	if err != nil {
 		return nil, errors.New("letter_date must be in YYYY-MM-DD format")
 	}

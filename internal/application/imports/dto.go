@@ -16,11 +16,12 @@ type ImportErrorDTO struct {
 type ImportedLetterRow struct {
 	RowNumber int `json:"row_number"`
 
-	LetterNumber int64  `json:"letter_number"`
-	Title        string `json:"title"`
-	LetterDate   string `json:"letter_date"`
-	Sender       string `json:"sender"`
-	Receiver     string `json:"receiver"`
+	LetterNumber     int64  `json:"letter_number"`
+	Title            string `json:"title"`
+	LetterDate       string `json:"letter_date"`
+	LetterDateJalali string `json:"letter_date_jalali"`
+	Sender           string `json:"sender"`
+	Receiver         string `json:"receiver"`
 }
 
 type ImportJobDTO struct {

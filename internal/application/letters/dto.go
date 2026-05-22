@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
+	"github.com/hajimohammadinet/dabir/internal/shared/dateutil"
 )
 
 type LetterDTO struct {
@@ -12,8 +13,9 @@ type LetterDTO struct {
 	LetterNumber          int64  `json:"letter_number"`
 	FormattedLetterNumber string `json:"formatted_letter_number"`
 
-	Title      string `json:"title"`
-	LetterDate string `json:"letter_date"`
+	Title            string `json:"title"`
+	LetterDate       string `json:"letter_date"`
+	LetterDateJalali string `json:"letter_date_jalali"`
 
 	RegistrarName string `json:"registrar_name"`
 	Sender        string `json:"sender"`
@@ -42,12 +44,13 @@ func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 		LetterNumber:          l.LetterNumber,
 		FormattedLetterNumber: FormatLetterNumber(l.LetterNumber, cfg),
 
-		Title:         l.Title,
-		LetterDate:    l.LetterDate.Format("2006-01-02"),
-		RegistrarName: l.RegistrarName,
-		Sender:        l.Sender,
-		Receiver:      l.Receiver,
-		Description:   l.Description,
+		Title:            l.Title,
+		LetterDate:       l.LetterDate.Format("2006-01-02"),
+		LetterDateJalali: dateutil.ToJalaliString(l.LetterDate),
+		RegistrarName:    l.RegistrarName,
+		Sender:           l.Sender,
+		Receiver:         l.Receiver,
+		Description:      l.Description,
 
 		CreatedBy: l.CreatedBy,
 		UpdatedBy: l.UpdatedBy,

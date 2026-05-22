@@ -5,6 +5,7 @@ export type Letter = {
 
   title: string;
   letter_date: string;
+  letter_date_jalali: string;
 
   registrar_name: string;
   sender: string;

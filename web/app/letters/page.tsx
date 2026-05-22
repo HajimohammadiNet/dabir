@@ -148,7 +148,7 @@ export default function LettersPage() {
                             {letter.formatted_letter_number}
                           </TableCell>
                           <TableCell>{letter.title}</TableCell>
-                          <TableCell>{letter.letter_date}</TableCell>
+                          <TableCell dir="ltr">{letter.letter_date_jalali}</TableCell>
                           <TableCell>{letter.sender}</TableCell>
                           <TableCell>{letter.receiver}</TableCell>
                           <TableCell>{letter.registrar_name}</TableCell>

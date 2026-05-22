@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hajimohammadinet/dabir/internal/shared/dateutil"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -207,6 +208,8 @@ func parseLetterRow(rowNumber int, row []string, columnIndex map[string]int) (Im
 	}
 
 	letterDate, err := parseExcelDate(dateRaw)
+	parsedGregorianDate, _ := time.Parse("2006-01-02", letterDate)
+	letterDateJalali := dateutil.ToJalaliString(parsedGregorianDate)
 	if err != nil {
 		errorsList = append(errorsList, ImportErrorDTO{
 			Row:     rowNumber,
@@ -244,12 +247,13 @@ func parseLetterRow(rowNumber int, row []string, columnIndex map[string]int) (Im
 	}
 
 	return ImportedLetterRow{
-		RowNumber:    rowNumber,
-		LetterNumber: letterNumber,
-		Title:        title,
-		LetterDate:   letterDate,
-		Sender:       sender,
-		Receiver:     receiver,
+		RowNumber:        rowNumber,
+		LetterNumber:     letterNumber,
+		Title:            title,
+		LetterDate:       letterDate,
+		LetterDateJalali: letterDateJalali,
+		Sender:           sender,
+		Receiver:         receiver,
 	}, nil
 }
 
@@ -288,6 +292,10 @@ func parseExcelDate(value string) (string, error) {
 		return "", errors.New("letter date is required")
 	}
 
+	if parsed, err := dateutil.ParseOfficialDate(value); err == nil {
+		return parsed.Format("2006-01-02"), nil
+	}
+
 	formats := []string{
 		"2006-01-02",
 		"2006/01/02",
@@ -302,7 +310,6 @@ func parseExcelDate(value string) (string, error) {
 		}
 	}
 
-	// Excel sometimes gives serial date as number.
 	if serial, err := strconv.ParseFloat(value, 64); err == nil {
 		parsed, err := excelize.ExcelDateToTime(serial, false)
 		if err == nil {
@@ -310,7 +317,7 @@ func parseExcelDate(value string) (string, error) {
 		}
 	}
 
-	return "", errors.New("invalid date format, expected YYYY-MM-DD")
+	return "", errors.New("invalid date format, expected Jalali YYYY/MM/DD")
 }
 
 func isEmptyRow(row []string) bool {

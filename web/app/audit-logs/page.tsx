@@ -8,6 +8,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { useAuth } from "@/contexts/auth-context";
 import { listAuditLogs } from "@/lib/api/audit";
+import { useI18n } from "@/lib/i18n/i18n-context";
 import type { AuditLog } from "@/types/audit";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,8 @@ const actionOptions = [
   "user.updated",
   "user.activated",
   "user.deactivated",
+  "user.password_changed",
+  "user.password_reset",
   "letter.created",
   "letter.updated",
   "letter.deleted",
@@ -54,6 +57,7 @@ const entityTypeOptions = ["", "setup", "auth", "user", "letter", "import_job"];
 
 export default function AuditLogsPage() {
   const { token } = useAuth();
+  const { t } = useI18n();
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [action, setAction] = useState("");
@@ -99,15 +103,17 @@ export default function AuditLogsPage() {
       <AppShell>
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {t.auditLogs}
+            </h1>
             <p className="text-muted-foreground">
-              Review important system activities and changes.
+              {t.auditLogsDescription}
             </p>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Filters</CardTitle>
+              <CardTitle>{t.filters}</CardTitle>
             </CardHeader>
 
             <CardContent>
@@ -119,7 +125,7 @@ export default function AuditLogsPage() {
                 }}
               >
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Action</label>
+                  <label className="text-sm font-medium">{t.action}</label>
                   <select
                     value={action}
                     onChange={(event) => setAction(event.target.value)}
@@ -127,14 +133,16 @@ export default function AuditLogsPage() {
                   >
                     {actionOptions.map((item) => (
                       <option key={item || "all"} value={item}>
-                        {item || "All actions"}
+                        {item || t.allActions}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Entity Type</label>
+                  <label className="text-sm font-medium">
+                    {t.entityType}
+                  </label>
                   <select
                     value={entityType}
                     onChange={(event) => setEntityType(event.target.value)}
@@ -142,24 +150,27 @@ export default function AuditLogsPage() {
                   >
                     {entityTypeOptions.map((item) => (
                       <option key={item || "all"} value={item}>
-                        {item || "All entities"}
+                        {item || t.allEntities}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Actor User ID</label>
+                  <label className="text-sm font-medium">
+                    {t.actorUserId}
+                  </label>
                   <Input
                     value={actorUserID}
                     onChange={(event) => setActorUserID(event.target.value)}
                     placeholder="UUID"
+                    dir="ltr"
                   />
                 </div>
 
                 <div className="flex items-end">
                   <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Loading..." : "Apply Filters"}
+                    {loading ? t.commonLoading : t.applyFilters}
                   </Button>
                 </div>
               </form>
@@ -168,7 +179,7 @@ export default function AuditLogsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Audit Logs</CardTitle>
+              <CardTitle>{t.auditLogs}</CardTitle>
             </CardHeader>
 
             <CardContent>
@@ -176,12 +187,14 @@ export default function AuditLogsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Entity</TableHead>
-                      <TableHead>Actor</TableHead>
-                      <TableHead>IP</TableHead>
-                      <TableHead className="text-right">Details</TableHead>
+                      <TableHead>{t.createdAt}</TableHead>
+                      <TableHead>{t.action}</TableHead>
+                      <TableHead>{t.entityType}</TableHead>
+                      <TableHead>{t.actorUserId}</TableHead>
+                      <TableHead>{t.ipAddress}</TableHead>
+                      <TableHead className="text-end">
+                        {t.commonView}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -192,7 +205,7 @@ export default function AuditLogsPage() {
                           colSpan={6}
                           className="text-center text-muted-foreground"
                         >
-                          {loading ? "Loading..." : "No audit logs found."}
+                          {loading ? t.commonLoading : t.noAuditLogsFound}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -211,25 +224,25 @@ export default function AuditLogsPage() {
                               {log.entity_type}
                             </div>
                             {log.entity_id ? (
-                              <div className="text-xs text-muted-foreground">
+                              <div className="text-xs text-muted-foreground break-all">
                                 {log.entity_id}
                               </div>
                             ) : null}
                           </TableCell>
 
-                          <TableCell className="text-xs">
+                          <TableCell className="text-xs break-all">
                             {log.actor_user_id || "-"}
                           </TableCell>
 
-                          <TableCell>{log.ip_address || "-"}</TableCell>
+                          <TableCell dir="ltr">{log.ip_address || "-"}</TableCell>
 
-                          <TableCell className="text-right">
+                          <TableCell className="text-end">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => setSelectedLog(log)}
                             >
-                              View
+                              {t.commonView}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -249,48 +262,52 @@ export default function AuditLogsPage() {
           >
             <DialogContent className="max-w-4xl">
               <DialogHeader>
-                <DialogTitle>Audit Log Details</DialogTitle>
+                <DialogTitle>{t.auditLogDetails}</DialogTitle>
               </DialogHeader>
 
               {selectedLog ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2 text-sm">
                     <InfoItem label="ID" value={selectedLog.id} />
-                    <InfoItem label="Action" value={selectedLog.action} />
+                    <InfoItem label={t.action} value={selectedLog.action} />
                     <InfoItem
-                      label="Entity Type"
+                      label={t.entityType}
                       value={selectedLog.entity_type}
                     />
                     <InfoItem
-                      label="Entity ID"
+                      label={t.entityId}
                       value={selectedLog.entity_id || "-"}
                     />
                     <InfoItem
-                      label="Actor User ID"
+                      label={t.actorUserId}
                       value={selectedLog.actor_user_id || "-"}
                     />
                     <InfoItem
-                      label="IP Address"
+                      label={t.ipAddress}
                       value={selectedLog.ip_address || "-"}
                     />
                     <InfoItem
-                      label="Created At"
+                      label={t.createdAt}
                       value={new Date(selectedLog.created_at).toLocaleString()}
                     />
                     <InfoItem
-                      label="User Agent"
+                      label={t.userAgent}
                       value={selectedLog.user_agent || "-"}
                     />
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <h3 className="mb-2 text-sm font-medium">Old Value</h3>
+                      <h3 className="mb-2 text-sm font-medium">
+                        {t.oldValue}
+                      </h3>
                       <JsonViewer value={selectedLog.old_value} />
                     </div>
 
                     <div>
-                      <h3 className="mb-2 text-sm font-medium">New Value</h3>
+                      <h3 className="mb-2 text-sm font-medium">
+                        {t.newValue}
+                      </h3>
                       <JsonViewer value={selectedLog.new_value} />
                     </div>
                   </div>
@@ -308,7 +325,9 @@ function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="text-muted-foreground">{label}</div>
-      <div className="break-all font-medium">{value}</div>
+      <div className="break-all font-medium" dir="auto">
+        {value}
+      </div>
     </div>
   );
 }

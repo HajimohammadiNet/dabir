@@ -57,7 +57,6 @@ export default function ChangePasswordPage() {
       });
 
       toast.success("Password changed successfully. Please login again.");
-
       logout();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to change password");
@@ -75,7 +74,7 @@ export default function ChangePasswordPage() {
               {t.changePassword}
             </h1>
             <p className="text-muted-foreground">
-              Update your account password.
+              {t.changePassword}
             </p>
           </div>
 
@@ -83,7 +82,7 @@ export default function ChangePasswordPage() {
             <CardHeader>
               <CardTitle>{t.changePassword}</CardTitle>
               <CardDescription>
-                After changing your password, you will be logged out.
+                {t.logout}
               </CardDescription>
             </CardHeader>
 
@@ -107,6 +106,7 @@ export default function ChangePasswordPage() {
                       setCurrentPassword(event.target.value)
                     }
                     required
+                    dir="ltr"
                   />
                 </div>
 
@@ -119,6 +119,7 @@ export default function ChangePasswordPage() {
                     onChange={(event) => setNewPassword(event.target.value)}
                     required
                     minLength={8}
+                    dir="ltr"
                   />
                 </div>
 
@@ -135,11 +136,12 @@ export default function ChangePasswordPage() {
                     }
                     required
                     minLength={8}
+                    dir="ltr"
                   />
                 </div>
 
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Changing..." : t.changePassword}
+                  {loading ? t.commonLoading : t.changePassword}
                 </Button>
               </form>
             </CardContent>

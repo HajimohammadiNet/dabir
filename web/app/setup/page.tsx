@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getSetupStatus, initializeSetup } from "@/lib/api/setup";
+import { useI18n } from "@/lib/i18n/i18n-context";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SetupPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [checking, setChecking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -86,7 +88,7 @@ export default function SetupPage() {
   if (checking) {
     return (
       <main className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
-        Checking setup status...
+        {t.commonLoading}
       </main>
     );
   }
@@ -95,31 +97,29 @@ export default function SetupPage() {
     <main className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Setup Dabir</CardTitle>
-          <CardDescription>
-            Initialize the application and create the first superuser.
-          </CardDescription>
+          <CardTitle>{t.setupDabir}</CardTitle>
+          <CardDescription>{t.setupDescription}</CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             {error ? (
               <Alert variant="destructive">
-                <AlertTitle>Setup error</AlertTitle>
+                <AlertTitle>{t.setup}</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             ) : null}
 
             <section className="space-y-4">
               <div>
-                <h2 className="font-semibold">Organization</h2>
+                <h2 className="font-semibold">{t.organization}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Basic organization information.
+                  {t.organizationSettingsDescription}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="organization_name">Organization Name</Label>
+                <Label htmlFor="organization_name">{t.organizationName}</Label>
                 <Input
                   id="organization_name"
                   value={organizationName}
@@ -131,26 +131,27 @@ export default function SetupPage() {
 
             <section className="space-y-4">
               <div>
-                <h2 className="font-semibold">Superuser</h2>
+                <h2 className="font-semibold">{t.superuser}</h2>
                 <p className="text-sm text-muted-foreground">
-                  This user will have full access to Dabir.
+                  {t.commonPermissionDenied}
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">{t.username}</Label>
                   <Input
                     id="username"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     required
                     minLength={3}
+                    dir="ltr"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
+                  <Label htmlFor="full_name">{t.fullName}</Label>
                   <Input
                     id="full_name"
                     value={fullName}
@@ -161,7 +162,7 @@ export default function SetupPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t.password}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -169,31 +170,33 @@ export default function SetupPage() {
                   onChange={(event) => setPassword(event.target.value)}
                   required
                   minLength={8}
+                  dir="ltr"
                 />
               </div>
             </section>
 
             <section className="space-y-4">
               <div>
-                <h2 className="font-semibold">Letter Numbering</h2>
+                <h2 className="font-semibold">{t.letterNumbering}</h2>
                 <p className="text-sm text-muted-foreground">
-                  Configure how letter numbers are displayed.
+                  {t.letterNumberingDescription}
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="number_prefix">Number Prefix</Label>
+                  <Label htmlFor="number_prefix">{t.numberPrefix}</Label>
                   <Input
                     id="number_prefix"
                     value={numberPrefix}
                     onChange={(event) => setNumberPrefix(event.target.value)}
                     required
+                    dir="ltr"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="number_padding">Number Padding</Label>
+                  <Label htmlFor="number_padding">{t.numberPadding}</Label>
                   <Input
                     id="number_padding"
                     type="number"
@@ -204,13 +207,14 @@ export default function SetupPage() {
                       setNumberPadding(Number(event.target.value))
                     }
                     required
+                    dir="ltr"
                   />
                 </div>
               </div>
 
               <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                Example:{" "}
-                <span className="font-medium">
+                {t.example}:{" "}
+                <span className="font-medium" dir="ltr">
                   {numberPrefix || "DABIR"}-
                   {"1".padStart(numberPadding || 6, "0")}
                 </span>
@@ -218,7 +222,7 @@ export default function SetupPage() {
             </section>
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Initializing..." : "Initialize Application"}
+              {submitting ? t.initializing : t.initializeApplication}
             </Button>
           </form>
         </CardContent>

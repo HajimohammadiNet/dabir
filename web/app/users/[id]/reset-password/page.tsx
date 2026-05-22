@@ -75,15 +75,14 @@ export default function ResetPasswordPage() {
               {t.resetPassword}
             </h1>
             <p className="text-muted-foreground">
-              Set a new password for this user.
+              {t.resetPassword}
             </p>
           </div>
 
           {user?.id === userID ? (
             <Alert>
               <AlertDescription>
-                You are resetting your own password. Prefer using Change
-                Password from your profile.
+                {t.changePassword}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -92,7 +91,7 @@ export default function ResetPasswordPage() {
             <CardHeader>
               <CardTitle>{t.resetPassword}</CardTitle>
               <CardDescription>
-                The target user can login with this new password immediately.
+                {t.newPassword}
               </CardDescription>
             </CardHeader>
 
@@ -113,6 +112,7 @@ export default function ResetPasswordPage() {
                     onChange={(event) => setNewPassword(event.target.value)}
                     required
                     minLength={8}
+                    dir="ltr"
                   />
                 </div>
 
@@ -129,12 +129,13 @@ export default function ResetPasswordPage() {
                     }
                     required
                     minLength={8}
+                    dir="ltr"
                   />
                 </div>
 
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading}>
-                    {loading ? "Resetting..." : t.resetPassword}
+                    {loading ? t.commonLoading : t.resetPassword}
                   </Button>
 
                   <Button
@@ -142,7 +143,7 @@ export default function ResetPasswordPage() {
                     variant="outline"
                     onClick={() => router.push("/users")}
                   >
-                    Cancel
+                    {t.commonCancel}
                   </Button>
                 </div>
               </form>

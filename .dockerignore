@@ -1,0 +1,14 @@
+.git
+.gitignore
+
+web/node_modules
+web/.next
+web/out
+web/.env.local
+
+tmp
+dist
+coverage
+
+.env
+.DS_Store

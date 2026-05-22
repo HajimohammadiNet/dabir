@@ -84,3 +84,11 @@ dev-reset:
 	docker compose --env-file .env -f $(COMPOSE_FILE) up -d postgres
 	sleep 3
 	migrate -path migrations -database "$(DB_URL)" up
+
+COMPOSE_FILE=deployments/docker-compose.yml
+
+web-logs:
+	docker compose -f $(COMPOSE_FILE) --env-file .env logs -f web
+
+compose-ps:
+	docker compose -f $(COMPOSE_FILE) --env-file .env ps

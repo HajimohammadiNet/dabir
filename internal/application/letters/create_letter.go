@@ -70,7 +70,7 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		Sender:        input.Sender,
 		Receiver:      input.Receiver,
 
-		Description: input.Description,
+		Description: normalizeOptionalString(input.Description),
 
 		CreatedBy: input.ActorUserID,
 		IsDeleted: false,
@@ -131,4 +131,17 @@ func validateCreateLetterInput(input CreateLetterInput) error {
 	}
 
 	return nil
+}
+
+func normalizeOptionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
 }

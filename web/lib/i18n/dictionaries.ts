@@ -143,6 +143,17 @@ export const dictionaries = {
     deleteLetterConfirmDescription: "Are you sure you want to delete this letter? This action will remove it from active letters.",
     confirmDelete: "Confirm Delete",
     letterDeleted: "Letter deleted successfully",
+
+    numberingMode: "Numbering Mode",
+    fixedPrefixNumbering: "Fixed Prefix",
+    fixedPrefixNumberingDescription: "Use a fixed prefix such as DABIR-000001.",
+    jalaliYearlyNumbering: "Jalali Yearly",
+    jalaliYearlyNumberingDescription: "Use Jalali year prefix such as 405-0001.",
+    yearlySerialPadding: "Yearly Serial Padding",
+    yearlySeparator: "Yearly Separator",
+    yearSource: "Year Source",
+    yearSourceLetterDate: "Letter Date",
+    yearSourceCreatedAt: "Created At",
   },
 
   fa: {
@@ -287,5 +298,16 @@ export const dictionaries = {
     deleteLetterConfirmDescription: "آیا از حذف این نامه مطمئن هستید؟ این نامه از لیست نامه‌های فعال حذف می‌شود.",
     confirmDelete: "تایید حذف",
     letterDeleted: "نامه با موفقیت حذف شد",
+
+    numberingMode: "مدل شماره‌گذاری",
+    fixedPrefixNumbering: "پیشوند ثابت",
+    fixedPrefixNumberingDescription: "استفاده از پیشوند ثابت مثل DABIR-000001.",
+    jalaliYearlyNumbering: "شماره‌گذاری سالانه شمسی",
+    jalaliYearlyNumberingDescription: "استفاده از پیشوند سال شمسی مثل 405-0001.",
+    yearlySerialPadding: "تعداد ارقام شماره سالانه",
+    yearlySeparator: "جداکننده شماره سالانه",
+    yearSource: "مبنای سال شماره",
+    yearSourceLetterDate: "تاریخ نامه",
+    yearSourceCreatedAt: "زمان ثبت",
   },
 } as const;

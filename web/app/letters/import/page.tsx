@@ -1,17 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/contexts/auth-context";
-import {
-  commitLettersImport,
-  previewLettersImport,
-} from "@/lib/api/imports";
+import { deleteLetter, listLetters } from "@/lib/api/letters";
 import { useI18n } from "@/lib/i18n/i18n-context";
-import type { ImportJob } from "@/types/import";
+import type { Letter } from "@/types/letter";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +19,14 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -31,339 +35,489 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-export default function ImportLettersPage() {
-  const { token } = useAuth();
+const DEFAULT_PAGE_SIZE = 20;
+
+export default function LettersPage() {
+  const { token, user } = useAuth();
   const { t } = useI18n();
 
-  const [file, setFile] = useState<File | null>(null);
-  const [importJob, setImportJob] = useState<ImportJob | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [commitLoading, setCommitLoading] = useState(false);
+  const [letters, setLetters] = useState<Letter[]>([]);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const canCommit =
-    importJob &&
-    importJob.status === "previewed" &&
-    importJob.invalid_rows === 0 &&
-    importJob.valid_rows > 0;
+  const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Letter | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  async function handlePreview(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const canCreate = user?.role === "superuser" || user?.role === "editor";
+  const canDelete = user?.role === "superuser" || user?.role === "editor";
 
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(total / pageSize));
+  }, [total, pageSize]);
+
+  const loadLetters = useCallback(async () => {
     if (!token) return;
 
-    if (!file) {
-      toast.error("Please select an Excel file");
-      return;
-    }
-
-    setPreviewLoading(true);
-    setImportJob(null);
+    setLoading(true);
 
     try {
-      const result = await previewLettersImport(token, file);
-      setImportJob(result);
+      const result = await listLetters(token, {
+        page,
+        page_size: pageSize,
+        search: appliedSearch,
+      });
 
-      if (result.invalid_rows > 0) {
-        toast.warning("Preview completed with errors");
-      } else {
-        toast.success("Preview completed successfully");
-      }
+      setLetters(result.items);
+      setTotal(result.total);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Preview failed");
+      toast.error(err instanceof Error ? err.message : "Failed to load letters");
     } finally {
-      setPreviewLoading(false);
+      setLoading(false);
+    }
+  }, [token, page, pageSize, appliedSearch]);
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(() => {
+        void loadLetters();
+    }, 0);
+
+    return () => {
+        window.clearTimeout(timeoutID);
+    };
+    }, [loadLetters]);
+
+  async function handleDeleteLetter() {
+    if (!token || !deleteTarget) return;
+
+    setDeleteLoading(true);
+
+    try {
+      await deleteLetter(token, deleteTarget.id);
+
+      toast.success(t.letterDeleted);
+      setDeleteTarget(null);
+      setSelectedLetter(null);
+
+      await loadLetters();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete letter");
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
-  async function handleCommit() {
-    if (!token || !importJob) return;
+  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPage(1);
+    setAppliedSearch(search.trim());
+  }
 
-    setCommitLoading(true);
-
-    try {
-      const result = await commitLettersImport(token, importJob.id);
-
-      toast.success(
-        `Imported ${result.imported_rows} rows. Next number: ${result.next_letter_number}`
-      );
-
-      setImportJob({
-        ...importJob,
-        status: "committed",
-        committed_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Commit failed");
-    } finally {
-      setCommitLoading(false);
-    }
+  function handlePageSizeChange(value: string) {
+    setPage(1);
+    setPageSize(Number(value));
   }
 
   return (
-    <ProtectedRoute allowedRoles={["superuser"]}>
+    <ProtectedRoute>
       <AppShell>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t.importLetters}
-            </h1>
-            <p className="text-muted-foreground">
-              {t.importLettersDescription}
-            </p>
+        <div className="min-w-0 space-y-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {t.letters}
+              </h1>
+              <p className="text-muted-foreground">{t.lettersDescription}</p>
+            </div>
+
+            {canCreate ? (
+              <Link href="/letters/new">
+                <Button>{t.newLetter}</Button>
+              </Link>
+            ) : null}
           </div>
 
-          <Card>
+          <Card className="max-w-full">
             <CardHeader>
-              <CardTitle>{t.uploadExcelFile}</CardTitle>
-              <CardDescription>{t.uploadExcelDescription}</CardDescription>
+              <CardTitle>{t.commonSearch}</CardTitle>
             </CardHeader>
-
             <CardContent>
-              <form onSubmit={handlePreview} className="space-y-4">
+              <form
+                className="grid gap-3 md:grid-cols-[1fr_auto]"
+                onSubmit={handleSearchSubmit}
+              >
                 <Input
-                  type="file"
-                  accept=".xlsx"
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0] || null);
-                    setImportJob(null);
-                  }}
+                  placeholder={t.searchLettersPlaceholder}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
                 />
-
-                <Button type="submit" disabled={previewLoading}>
-                  {previewLoading ? t.previewing : t.previewImport}
+                <Button type="submit" disabled={loading}>
+                  {loading ? t.commonLoading : t.commonSearch}
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          {importJob ? (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t.importSummary}</CardTitle>
-                  <CardDescription>{importJob.file_name}</CardDescription>
-                </CardHeader>
+          <Card className="max-w-full overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <CardTitle>{t.letters}</CardTitle>
 
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-5">
-                    <SummaryItem label={t.commonStatus}>
-                      <Badge
-                        variant={
-                          importJob.status === "committed"
-                            ? "secondary"
-                            : "outline"
-                        }
-                      >
-                        {importJob.status}
-                      </Badge>
-                    </SummaryItem>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span dir="ltr">
+                  {total.toLocaleString()} {t.letters}
+                </span>
 
-                    <SummaryItem label={t.totalRows}>
-                      {importJob.total_rows}
-                    </SummaryItem>
+                <select
+                  value={pageSize}
+                  onChange={(event) => handlePageSizeChange(event.target.value)}
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </CardHeader>
 
-                    <SummaryItem label={t.validRows}>
-                      {importJob.valid_rows}
-                    </SummaryItem>
+            <CardContent className="min-w-0">
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[130px] whitespace-nowrap">
+                        {t.number}
+                      </TableHead>
+                      <TableHead>{t.letterTitle}</TableHead>
+                      <TableHead className="w-[120px] whitespace-nowrap">
+                        {t.letterDate}
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        {t.sender}
+                      </TableHead>
+                      <TableHead className="hidden xl:table-cell">
+                        {t.receiver}
+                      </TableHead>
+                      <TableHead className="hidden 2xl:table-cell">
+                        {t.registrar}
+                      </TableHead>
+                      <TableHead className="w-[90px] whitespace-nowrap">
+                        {t.commonStatus}
+                      </TableHead>
+                      <TableHead className="w-[150px] text-end whitespace-nowrap">
+                        {t.commonActions}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
 
-                    <SummaryItem label={t.invalidRows}>
-                      {importJob.invalid_rows}
-                    </SummaryItem>
+                  <TableBody>
+                    {letters.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="text-center text-muted-foreground"
+                        >
+                          {loading ? t.commonLoading : t.noLettersFound}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      letters.map((letter) => (
+                        <TableRow
+                          key={letter.id}
+                          className="cursor-pointer"
+                          onClick={() => setSelectedLetter(letter)}
+                        >
+                          <TableCell
+                            className="font-medium whitespace-nowrap"
+                            dir="ltr"
+                          >
+                            {letter.formatted_letter_number}
+                          </TableCell>
 
-                    <SummaryItem label={t.maxNumber}>
-                      {importJob.max_letter_number || "-"}
-                    </SummaryItem>
-                  </div>
+                          <TableCell className="max-w-[420px]">
+                            <div className="line-clamp-2 font-medium">
+                              {letter.title}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground lg:hidden">
+                              {letter.sender} ← {letter.receiver}
+                            </div>
+                          </TableCell>
 
-                  <div className="mt-6">
-                    <Button
-                      onClick={handleCommit}
-                      disabled={!canCommit || commitLoading}
-                    >
-                      {commitLoading ? t.committing : t.commitImport}
-                    </Button>
+                          <TableCell className="whitespace-nowrap" dir="ltr">
+                            {letter.letter_date_jalali}
+                          </TableCell>
 
-                    {!canCommit && importJob.status === "previewed" ? (
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Import can be committed only when there are no invalid
-                        rows.
-                      </p>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
+                          <TableCell className="hidden max-w-[260px] lg:table-cell">
+                            <div className="line-clamp-2">{letter.sender}</div>
+                          </TableCell>
 
-              <DetectedColumnsCard importJob={importJob} />
+                          <TableCell className="hidden max-w-[260px] xl:table-cell">
+                            <div className="line-clamp-2">{letter.receiver}</div>
+                          </TableCell>
 
-              <ImportErrorsCard importJob={importJob} />
+                          <TableCell className="hidden 2xl:table-cell">
+                            {letter.registrar_name}
+                          </TableCell>
 
-              <PreviewRowsCard importJob={importJob} />
-            </>
-          ) : null}
+                          <TableCell>
+                            {letter.is_deleted ? (
+                              <Badge variant="destructive">
+                                {t.commonDeleted}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                {t.commonActive}
+                              </Badge>
+                            )}
+                          </TableCell>
+
+                          <TableCell
+                            className="text-end"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedLetter(letter)}
+                              >
+                                {t.commonView}
+                              </Button>
+
+                              {canDelete ? (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => setDeleteTarget(letter)}
+                                >
+                                  {t.commonDelete}
+                                </Button>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-muted-foreground" dir="ltr">
+                  Page {page} of {totalPages}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  >
+                    قبلی
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages || loading}
+                    onClick={() =>
+                      setPage((current) => Math.min(totalPages, current + 1))
+                    }
+                  >
+                    بعدی
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <LetterPreviewDialog
+            letter={selectedLetter}
+            canDelete={canDelete}
+            onClose={() => setSelectedLetter(null)}
+            onDelete={(letter) => setDeleteTarget(letter)}
+          />
+
+          <DeleteLetterDialog
+            letter={deleteTarget}
+            loading={deleteLoading}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={() => void handleDeleteLetter()}
+          />
         </div>
       </AppShell>
     </ProtectedRoute>
   );
 }
 
-function SummaryItem({
+function LetterPreviewDialog({
+  letter,
+  canDelete,
+  onClose,
+  onDelete,
+}: {
+  letter: Letter | null;
+  canDelete: boolean;
+  onClose: () => void;
+  onDelete: (letter: Letter) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Dialog open={Boolean(letter)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{t.letterDetails}</DialogTitle>
+          <DialogDescription>
+            {letter?.formatted_letter_number || ""}
+          </DialogDescription>
+        </DialogHeader>
+
+        {letter ? (
+          <div className="space-y-6">
+            <div className="rounded-xl border bg-muted/30 p-6 text-center">
+              <div className="text-sm text-muted-foreground">{t.number}</div>
+              <div className="mt-2 text-4xl font-bold tracking-wide" dir="ltr">
+                {letter.formatted_letter_number}
+              </div>
+            </div>
+
+            <div className="grid gap-3 text-sm">
+              <InfoRow label={t.letterTitle} value={letter.title} />
+              <InfoRow
+                label={t.letterDate}
+                value={letter.letter_date_jalali}
+                forceLtr
+              />
+              <InfoRow label={t.sender} value={letter.sender} />
+              <InfoRow label={t.receiver} value={letter.receiver} />
+              <InfoRow label={t.registrar} value={letter.registrar_name} />
+              <InfoRow
+                label={t.commonStatus}
+                value={letter.is_deleted ? t.commonDeleted : t.commonActive}
+                badge
+                badgeVariant={letter.is_deleted ? "destructive" : "secondary"}
+              />
+              <InfoRow label={t.description} value={letter.description || "-"} />
+              <InfoRow
+                label={t.createdAt}
+                value={new Date(letter.created_at).toLocaleString()}
+                forceLtr
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={onClose}>
+                {t.commonCancel}
+              </Button>
+
+              {canDelete && !letter.is_deleted ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    onClose();
+                    onDelete(letter);
+                  }}
+                >
+                  {t.deleteLetter}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteLetterDialog({
+  letter,
+  loading,
+  onClose,
+  onConfirm,
+}: {
+  letter: Letter | null;
+  loading: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Dialog open={Boolean(letter)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t.deleteLetterConfirmTitle}</DialogTitle>
+          <DialogDescription>
+            {t.deleteLetterConfirmDescription}
+          </DialogDescription>
+        </DialogHeader>
+
+        {letter ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="text-sm text-muted-foreground">{t.number}</div>
+              <div className="mt-1 font-bold" dir="ltr">
+                {letter.formatted_letter_number}
+              </div>
+              <div className="mt-2 text-sm">{letter.title}</div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="destructive"
+                disabled={loading}
+                onClick={onConfirm}
+              >
+                {loading ? t.commonLoading : t.confirmDelete}
+              </Button>
+
+              <Button variant="outline" onClick={onClose} disabled={loading}>
+                {t.commonCancel}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InfoRow({
   label,
-  children,
+  value,
+  forceLtr,
+  badge,
+  badgeVariant = "secondary",
 }: {
   label: string;
-  children: React.ReactNode;
+  value: string;
+  forceLtr?: boolean;
+  badge?: boolean;
+  badgeVariant?: "default" | "secondary" | "destructive" | "outline";
 }) {
   return (
-    <div className="rounded-lg border bg-background p-4">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{children}</div>
+    <div className="flex items-start justify-between gap-4 border-b pb-2 last:border-b-0">
+      <div className="text-muted-foreground">{label}</div>
+
+      {badge ? (
+        <Badge variant={badgeVariant}>{value}</Badge>
+      ) : (
+        <div
+          className="max-w-md whitespace-pre-wrap break-words text-end font-medium"
+          dir={forceLtr ? "ltr" : "auto"}
+        >
+          {value}
+        </div>
+      )}
     </div>
-  );
-}
-
-function DetectedColumnsCard({ importJob }: { importJob: ImportJob }) {
-  const { t } = useI18n();
-
-  const columns = importJob.detected_columns || {};
-  const entries = Object.entries(columns);
-
-  if (entries.length === 0) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t.detectedColumns}</CardTitle>
-      </CardHeader>
-
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t.field}</TableHead>
-                <TableHead>{t.detectedColumn}</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {entries.map(([field, column]) => (
-                <TableRow key={field}>
-                  <TableCell className="font-medium">{field}</TableCell>
-                  <TableCell>{column}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ImportErrorsCard({ importJob }: { importJob: ImportJob }) {
-  const { t } = useI18n();
-
-  const errors = importJob.errors || [];
-
-  if (errors.length === 0) {
-    return (
-      <Alert>
-        <AlertTitle>{t.noErrorsFound}</AlertTitle>
-        <AlertDescription>{t.importReady}</AlertDescription>
-      </Alert>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t.importErrors}</CardTitle>
-        <CardDescription>{t.importErrorsDescription}</CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t.excelRow}</TableHead>
-                <TableHead>{t.field}</TableHead>
-                <TableHead>{t.description}</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {errors.map((error, index) => (
-                <TableRow key={`${error.row}-${error.field}-${index}`}>
-                  <TableCell>{error.row}</TableCell>
-                  <TableCell>{error.field}</TableCell>
-                  <TableCell>{error.message}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function PreviewRowsCard({ importJob }: { importJob: ImportJob }) {
-  const { t } = useI18n();
-
-  const rows = importJob.preview_data || [];
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t.previewRows}</CardTitle>
-        <CardDescription>{t.previewRowsDescription}</CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t.excelRow}</TableHead>
-                <TableHead>{t.number}</TableHead>
-                <TableHead>{t.letterTitle}</TableHead>
-                <TableHead>{t.letterDate}</TableHead>
-                <TableHead>{t.sender}</TableHead>
-                <TableHead>{t.receiver}</TableHead>
-              </TableRow>
-            </TableHeader>
-
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center text-muted-foreground"
-                  >
-                    {t.noValidRowsFound}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => (
-                  <TableRow key={`${row.row_number}-${row.letter_number}`}>
-                    <TableCell>{row.row_number}</TableCell>
-                    <TableCell>{row.letter_number}</TableCell>
-                    <TableCell>{row.title}</TableCell>
-                    <TableCell dir="ltr">{row.letter_date_jalali || row.letter_date}</TableCell>
-                    <TableCell>{row.sender}</TableCell>
-                    <TableCell>{row.receiver}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

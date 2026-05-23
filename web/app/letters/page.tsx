@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -36,12 +36,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const DEFAULT_PAGE_SIZE = 20;
+
 export default function LettersPage() {
   const { token, user } = useAuth();
   const { t } = useI18n();
 
   const [letters, setLetters] = useState<Letter[]>([]);
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
@@ -51,6 +57,13 @@ export default function LettersPage() {
   const canCreate = user?.role === "superuser" || user?.role === "editor";
   const canDelete = user?.role === "superuser" || user?.role === "editor";
 
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(total / pageSize));
+  }, [total, pageSize]);
+
+  const startItem = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, total);
+
   const loadLetters = useCallback(async () => {
     if (!token) return;
 
@@ -58,25 +71,28 @@ export default function LettersPage() {
 
     try {
       const result = await listLetters(token, {
-        page: 1,
-        page_size: 20,
-        search,
+        page,
+        page_size: pageSize,
+        search: appliedSearch,
       });
 
       setLetters(result.items);
+      setTotal(result.total);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load letters");
     } finally {
       setLoading(false);
     }
-  }, [token, search]);
+  }, [token, page, pageSize, appliedSearch]);
 
   useEffect(() => {
-    const load = async () => {
-      await loadLetters();
-    };
+    const timeoutID = window.setTimeout(() => {
+      void loadLetters();
+    }, 0);
 
-    void load();
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
   }, [loadLetters]);
 
   async function handleDeleteLetter() {
@@ -99,12 +115,23 @@ export default function LettersPage() {
     }
   }
 
+  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPage(1);
+    setAppliedSearch(search.trim());
+  }
+
+  function handlePageSizeChange(value: string) {
+    setPage(1);
+    setPageSize(Number(value));
+  }
+
   return (
     <ProtectedRoute>
       <AppShell>
-        <div className="space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+        <div className="min-w-0 space-y-6 pb-16 md:pb-0">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
               <h1 className="text-3xl font-bold tracking-tight">
                 {t.letters}
               </h1>
@@ -118,23 +145,22 @@ export default function LettersPage() {
             ) : null}
           </div>
 
-          <Card>
+          <Card className="max-w-full">
             <CardHeader>
               <CardTitle>{t.commonSearch}</CardTitle>
             </CardHeader>
+
             <CardContent>
               <form
-                className="flex gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void loadLetters();
-                }}
+                className="grid gap-3 md:grid-cols-[1fr_auto]"
+                onSubmit={handleSearchSubmit}
               >
                 <Input
                   placeholder={t.searchLettersPlaceholder}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
+
                 <Button type="submit" disabled={loading}>
                   {loading ? t.commonLoading : t.commonSearch}
                 </Button>
@@ -142,23 +168,53 @@ export default function LettersPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card className="max-w-full overflow-hidden">
+            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <CardTitle>{t.letters}</CardTitle>
+
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <span>
+                  نمایش {startItem} تا {endItem} از {total}
+                </span>
+
+                <select
+                  value={pageSize}
+                  onChange={(event) => handlePageSizeChange(event.target.value)}
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
             </CardHeader>
-            <CardContent>
+
+            <CardContent className="min-w-0">
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{t.number}</TableHead>
+                      <TableHead className="w-[130px] whitespace-nowrap">
+                        {t.number}
+                      </TableHead>
                       <TableHead>{t.letterTitle}</TableHead>
-                      <TableHead>{t.letterDate}</TableHead>
-                      <TableHead>{t.sender}</TableHead>
-                      <TableHead>{t.receiver}</TableHead>
-                      <TableHead>{t.registrar}</TableHead>
-                      <TableHead>{t.commonStatus}</TableHead>
-                      <TableHead className="text-end">
+                      <TableHead className="w-[120px] whitespace-nowrap">
+                        {t.letterDate}
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell">
+                        {t.sender}
+                      </TableHead>
+                      <TableHead className="hidden xl:table-cell">
+                        {t.receiver}
+                      </TableHead>
+                      <TableHead className="hidden 2xl:table-cell">
+                        {t.registrar}
+                      </TableHead>
+                      <TableHead className="w-[90px] whitespace-nowrap">
+                        {t.commonStatus}
+                      </TableHead>
+                      <TableHead className="w-[150px] whitespace-nowrap text-end">
                         {t.commonActions}
                       </TableHead>
                     </TableRow>
@@ -169,7 +225,7 @@ export default function LettersPage() {
                       <TableRow>
                         <TableCell
                           colSpan={8}
-                          className="text-center text-muted-foreground"
+                          className="py-10 text-center text-muted-foreground"
                         >
                           {loading ? t.commonLoading : t.noLettersFound}
                         </TableCell>
@@ -181,21 +237,40 @@ export default function LettersPage() {
                           className="cursor-pointer"
                           onClick={() => setSelectedLetter(letter)}
                         >
-                          <TableCell className="font-medium" dir="ltr">
+                          <TableCell
+                            className="whitespace-nowrap font-medium"
+                            dir="ltr"
+                          >
                             {letter.formatted_letter_number}
                           </TableCell>
 
-                          <TableCell>{letter.title}</TableCell>
+                          <TableCell className="max-w-[420px]">
+                            <div className="line-clamp-2 font-medium">
+                              {letter.title}
+                            </div>
 
-                          <TableCell dir="ltr">
+                            <div className="mt-1 text-xs text-muted-foreground lg:hidden">
+                              {letter.sender} ← {letter.receiver}
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="whitespace-nowrap" dir="ltr">
                             {letter.letter_date_jalali}
                           </TableCell>
 
-                          <TableCell>{letter.sender}</TableCell>
+                          <TableCell className="hidden max-w-[260px] lg:table-cell">
+                            <div className="line-clamp-2">{letter.sender}</div>
+                          </TableCell>
 
-                          <TableCell>{letter.receiver}</TableCell>
+                          <TableCell className="hidden max-w-[260px] xl:table-cell">
+                            <div className="line-clamp-2">
+                              {letter.receiver}
+                            </div>
+                          </TableCell>
 
-                          <TableCell>{letter.registrar_name}</TableCell>
+                          <TableCell className="hidden 2xl:table-cell">
+                            {letter.registrar_name}
+                          </TableCell>
 
                           <TableCell>
                             {letter.is_deleted ? (
@@ -238,6 +313,38 @@ export default function LettersPage() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                <div className="text-sm text-muted-foreground">
+                  صفحه {page} از {totalPages}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1 || loading}
+                    onClick={() =>
+                      setPage((current) => Math.max(1, current - 1))
+                    }
+                  >
+                    قبلی
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages || loading}
+                    onClick={() =>
+                      setPage((current) => Math.min(totalPages, current + 1))
+                    }
+                  >
+                    بعدی
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -309,10 +416,7 @@ function LetterPreviewDialog({
                 badge
                 badgeVariant={letter.is_deleted ? "destructive" : "secondary"}
               />
-              <InfoRow
-                label={t.description}
-                value={letter.description || "-"}
-              />
+              <InfoRow label={t.description} value={letter.description || "-"} />
               <InfoRow
                 label={t.createdAt}
                 value={new Date(letter.created_at).toLocaleString()}
@@ -417,7 +521,10 @@ function InfoRow({
       {badge ? (
         <Badge variant={badgeVariant}>{value}</Badge>
       ) : (
-        <div className="max-w-md whitespace-pre-wrap break-words text-end font-medium" dir={forceLtr ? "ltr" : "auto"}>
+        <div
+          className="max-w-md whitespace-pre-wrap break-words text-end font-medium"
+          dir={forceLtr ? "ltr" : "auto"}
+        >
           {value}
         </div>
       )}

@@ -13,13 +13,8 @@ type GetPublicSettingsUseCase struct {
 }
 
 type PublicSettingsOutput struct {
-	OrganizationName string             `json:"organization_name"`
-	LetterConfig     PublicLetterConfig `json:"letter_config"`
-}
-
-type PublicLetterConfig struct {
-	NumberPrefix  string `json:"number_prefix"`
-	NumberPadding int    `json:"number_padding"`
+	OrganizationName string                      `json:"organization_name"`
+	LetterConfig     domainsettings.LetterConfig `json:"letter_config"`
 }
 
 func NewGetPublicSettingsUseCase(settingsRepo domainsettings.Repository) *GetPublicSettingsUseCase {
@@ -31,10 +26,7 @@ func NewGetPublicSettingsUseCase(settingsRepo domainsettings.Repository) *GetPub
 func (uc *GetPublicSettingsUseCase) Execute(ctx context.Context) (*PublicSettingsOutput, error) {
 	output := &PublicSettingsOutput{
 		OrganizationName: "Dabir",
-		LetterConfig: PublicLetterConfig{
-			NumberPrefix:  "DABIR",
-			NumberPadding: 6,
-		},
+		LetterConfig:     domainsettings.DefaultLetterConfig(),
 	}
 
 	orgSetting, err := uc.settingsRepo.Get(ctx, domainsettings.KeyOrganizationName)
@@ -54,9 +46,13 @@ func (uc *GetPublicSettingsUseCase) Execute(ctx context.Context) (*PublicSetting
 	}
 
 	if letterSetting != nil {
-		if err := json.Unmarshal(letterSetting.Value, &output.LetterConfig); err != nil {
+		var storedConfig domainsettings.LetterConfig
+
+		if err := json.Unmarshal(letterSetting.Value, &storedConfig); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal letter config: %w", err)
 		}
+
+		output.LetterConfig = domainsettings.NormalizeLetterConfig(storedConfig)
 	}
 
 	return output, nil

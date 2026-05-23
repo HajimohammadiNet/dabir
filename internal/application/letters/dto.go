@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
+	domainsettings "github.com/hajimohammadinet/dabir/internal/domain/settings"
 	"github.com/hajimohammadinet/dabir/internal/shared/dateutil"
 )
 
@@ -33,9 +34,23 @@ type LetterDTO struct {
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }
 
+type NumberingMode string
+
+const (
+	NumberingModeFixedPrefix  NumberingMode = "fixed_prefix"
+	NumberingModeJalaliYearly NumberingMode = "jalali_yearly"
+)
+
 type LetterNumberConfig struct {
+	Mode NumberingMode
+
 	Prefix  string
 	Padding int
+
+	YearlyPrefixDigits  int
+	YearlySerialPadding int
+	YearlySeparator     string
+	YearSource          domainsettings.YearSource
 }
 
 func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {

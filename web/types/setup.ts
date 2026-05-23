@@ -11,9 +11,16 @@ export type InitializeSetupInput = {
     password: string;
   };
   letter_config: {
-    number_prefix: string;
-    number_padding: number;
-  };
+        numbering_mode: "fixed_prefix" | "jalali_yearly";
+
+        number_prefix: string;
+        number_padding: number;
+
+        yearly_prefix_digits: number;
+        yearly_serial_padding: number;
+        yearly_separator: string;
+        year_source: "letter_date" | "created_at";
+    };
 };
 
 export type InitializeSetupResponse = {

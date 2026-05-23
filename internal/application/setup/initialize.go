@@ -27,9 +27,9 @@ type InitializeUseCase struct {
 }
 
 type InitializeInput struct {
-	OrganizationName string                 `json:"organization_name"`
-	SuperUser        InitializeSuperUser    `json:"superuser"`
-	LetterConfig     InitializeLetterConfig `json:"letter_config"`
+	OrganizationName string                      `json:"organization_name"`
+	SuperUser        InitializeSuperUser         `json:"superuser"`
+	LetterConfig     InitializeLetterConfigInput `json:"letter_config"`
 }
 
 type InitializeSuperUser struct {
@@ -38,20 +38,22 @@ type InitializeSuperUser struct {
 	Password string `json:"password"`
 }
 
-type InitializeLetterConfig struct {
+type InitializeLetterConfigInput struct {
+	NumberingMode string `json:"numbering_mode"`
+
 	NumberPrefix  string `json:"number_prefix"`
 	NumberPadding int    `json:"number_padding"`
+
+	YearlyPrefixDigits  int    `json:"yearly_prefix_digits"`
+	YearlySerialPadding int    `json:"yearly_serial_padding"`
+	YearlySeparator     string `json:"yearly_separator"`
+	YearSource          string `json:"year_source"`
 }
 
 type InitializeOutput struct {
 	Initialized bool   `json:"initialized"`
 	UserID      string `json:"user_id"`
 	Username    string `json:"username"`
-}
-
-type storedLetterConfig struct {
-	NumberPrefix  string `json:"number_prefix"`
-	NumberPadding int    `json:"number_padding"`
 }
 
 func NewInitializeUseCase(
@@ -141,10 +143,7 @@ func (uc *InitializeUseCase) saveInitialSettings(ctx context.Context, input Init
 		return err
 	}
 
-	letterConfig := storedLetterConfig{
-		NumberPrefix:  input.LetterConfig.NumberPrefix,
-		NumberPadding: input.LetterConfig.NumberPadding,
-	}
+	letterConfig := normalizeLetterConfig(input.LetterConfig)
 
 	letterConfigValue, err := json.Marshal(letterConfig)
 	if err != nil {
@@ -162,18 +161,23 @@ func normalizeInitializeInput(input InitializeInput) InitializeInput {
 	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
 	input.SuperUser.Username = strings.TrimSpace(input.SuperUser.Username)
 	input.SuperUser.FullName = strings.TrimSpace(input.SuperUser.FullName)
-	input.LetterConfig.NumberPrefix = strings.TrimSpace(input.LetterConfig.NumberPrefix)
 
 	if input.OrganizationName == "" {
 		input.OrganizationName = "Dabir"
 	}
 
-	if input.LetterConfig.NumberPrefix == "" {
-		input.LetterConfig.NumberPrefix = "DABIR"
-	}
+	normalizedLetterConfig := normalizeLetterConfig(input.LetterConfig)
 
-	if input.LetterConfig.NumberPadding == 0 {
-		input.LetterConfig.NumberPadding = 6
+	input.LetterConfig = InitializeLetterConfigInput{
+		NumberingMode: string(normalizedLetterConfig.NumberingMode),
+
+		NumberPrefix:  normalizedLetterConfig.NumberPrefix,
+		NumberPadding: normalizedLetterConfig.NumberPadding,
+
+		YearlyPrefixDigits:  normalizedLetterConfig.YearlyPrefixDigits,
+		YearlySerialPadding: normalizedLetterConfig.YearlySerialPadding,
+		YearlySeparator:     normalizedLetterConfig.YearlySeparator,
+		YearSource:          string(normalizedLetterConfig.YearSource),
 	}
 
 	return input
@@ -196,9 +200,76 @@ func validateInitializeInput(input InitializeInput) error {
 		return errors.New("password must be at least 8 characters")
 	}
 
+	if input.LetterConfig.NumberingMode != "fixed_prefix" &&
+		input.LetterConfig.NumberingMode != "jalali_yearly" {
+		return errors.New("invalid numbering_mode")
+	}
+
 	if input.LetterConfig.NumberPadding < 1 || input.LetterConfig.NumberPadding > 12 {
 		return errors.New("number padding must be between 1 and 12")
 	}
 
+	if input.LetterConfig.YearlyPrefixDigits < 1 || input.LetterConfig.YearlyPrefixDigits > 4 {
+		return errors.New("yearly prefix digits must be between 1 and 4")
+	}
+
+	if input.LetterConfig.YearlySerialPadding < 1 || input.LetterConfig.YearlySerialPadding > 12 {
+		return errors.New("yearly serial padding must be between 1 and 12")
+	}
+
+	if input.LetterConfig.YearSource != "letter_date" &&
+		input.LetterConfig.YearSource != "created_at" {
+		return errors.New("invalid year_source")
+	}
+
 	return nil
+}
+
+func normalizeLetterConfig(input InitializeLetterConfigInput) settings.LetterConfig {
+	mode := input.NumberingMode
+	if mode == "" {
+		mode = "fixed_prefix"
+	}
+
+	numberPrefix := strings.TrimSpace(input.NumberPrefix)
+	if numberPrefix == "" {
+		numberPrefix = "DABIR"
+	}
+
+	numberPadding := input.NumberPadding
+	if numberPadding <= 0 {
+		numberPadding = 6
+	}
+
+	yearlyPrefixDigits := input.YearlyPrefixDigits
+	if yearlyPrefixDigits <= 0 {
+		yearlyPrefixDigits = 3
+	}
+
+	yearlySerialPadding := input.YearlySerialPadding
+	if yearlySerialPadding <= 0 {
+		yearlySerialPadding = 4
+	}
+
+	yearlySeparator := strings.TrimSpace(input.YearlySeparator)
+	if yearlySeparator == "" {
+		yearlySeparator = "-"
+	}
+
+	yearSource := input.YearSource
+	if yearSource == "" {
+		yearSource = "letter_date"
+	}
+
+	return settings.LetterConfig{
+		NumberingMode: settings.NumberingMode(mode),
+
+		NumberPrefix:  numberPrefix,
+		NumberPadding: numberPadding,
+
+		YearlyPrefixDigits:  yearlyPrefixDigits,
+		YearlySerialPadding: yearlySerialPadding,
+		YearlySeparator:     yearlySeparator,
+		YearSource:          settings.YearSource(yearSource),
+	}
 }

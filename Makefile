@@ -4,7 +4,7 @@ COMPOSE_FILE=deployments/docker-compose.yml
 DB_HOST ?= localhost
 DB_PORT ?= 5432
 DB_USER ?= dabir
-DB_PASSWORD ?= dabir_secret
+DB_PASSWORD ?= change-this-db-password
 DB_NAME ?= dabir
 DB_SSLMODE ?= disable
 

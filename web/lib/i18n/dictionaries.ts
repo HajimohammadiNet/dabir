@@ -136,6 +136,13 @@ export const dictionaries = {
     newPassword: "New Password",
     confirmPassword: "Confirm Password",
     resetPassword: "Reset Password",
+
+    letterDetails: "Letter Details",
+    deleteLetter: "Delete Letter",
+    deleteLetterConfirmTitle: "Delete Letter",
+    deleteLetterConfirmDescription: "Are you sure you want to delete this letter? This action will remove it from active letters.",
+    confirmDelete: "Confirm Delete",
+    letterDeleted: "Letter deleted successfully",
   },
 
   fa: {
@@ -273,5 +280,12 @@ export const dictionaries = {
     newPassword: "رمز عبور جدید",
     confirmPassword: "تکرار رمز عبور",
     resetPassword: "بازنشانی رمز عبور",
+
+    letterDetails: "جزئیات نامه",
+    deleteLetter: "حذف نامه",
+    deleteLetterConfirmTitle: "حذف نامه",
+    deleteLetterConfirmDescription: "آیا از حذف این نامه مطمئن هستید؟ این نامه از لیست نامه‌های فعال حذف می‌شود.",
+    confirmDelete: "تایید حذف",
+    letterDeleted: "نامه با موفقیت حذف شد",
   },
 } as const;

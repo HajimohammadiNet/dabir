@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	//"time"
+	"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
 	"github.com/hajimohammadinet/dabir/internal/shared/dateutil"
@@ -56,15 +56,11 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		return nil, errors.New("letter_date must be in Jalali YYYY/MM/DD format")
 	}
 
-	nextNumber, err := uc.letterRepo.NextNumber(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate letter number: %w", err)
-	}
+	cfg := uc.configProvider.Get(ctx)
 
 	l := &letter.Letter{
-		LetterNumber: nextNumber,
-		Title:        input.Title,
-		LetterDate:   letterDate,
+		Title:      input.Title,
+		LetterDate: letterDate,
 
 		RegistrarName: input.RegistrarName,
 		Sender:        input.Sender,
@@ -76,11 +72,32 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		IsDeleted: false,
 	}
 
+	if cfg.Mode == NumberingModeJalaliYearly {
+		jalaliYear := resolveJalaliYear(letterDate, cfg)
+		yearSuffix := BuildJalaliYearSuffix(jalaliYear, cfg.YearlyPrefixDigits)
+
+		nextSerial, err := uc.letterRepo.NextNumberForYear(ctx, jalaliYear)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate yearly letter number: %w", err)
+		}
+
+		l.LetterNumber = nextSerial
+		l.LetterYear = &jalaliYear
+		l.LetterYearSuffix = &yearSuffix
+		l.LetterSerial = &nextSerial
+	} else {
+		nextNumber, err := uc.letterRepo.NextNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate letter number: %w", err)
+		}
+
+		l.LetterNumber = nextNumber
+	}
+
 	if err := uc.letterRepo.Create(ctx, l); err != nil {
 		return nil, fmt.Errorf("failed to create letter: %w", err)
 	}
 
-	cfg := uc.configProvider.Get(ctx)
 	dto := ToLetterDTO(*l, cfg)
 
 	return &dto, nil
@@ -144,4 +161,15 @@ func normalizeOptionalString(value *string) *string {
 	}
 
 	return &trimmed
+}
+
+func resolveJalaliYear(letterDate time.Time, cfg LetterNumberConfig) int {
+	if cfg.YearSource == "created_at" {
+		now := time.Now().UTC()
+		jy, _, _ := dateutil.GregorianToJalali(now.Year(), int(now.Month()), now.Day())
+		return jy
+	}
+
+	jy, _, _ := dateutil.GregorianToJalali(letterDate.Year(), int(letterDate.Month()), letterDate.Day())
+	return jy
 }

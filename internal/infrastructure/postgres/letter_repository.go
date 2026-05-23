@@ -34,10 +34,36 @@ func (r *LetterRepository) NextNumber(ctx context.Context) (int64, error) {
 	return number, nil
 }
 
+func (r *LetterRepository) NextNumberForYear(ctx context.Context, jalaliYear int) (int64, error) {
+	const query = `
+		INSERT INTO letter_number_counters (
+			jalali_year,
+			last_number,
+			updated_at
+		)
+		VALUES ($1, 1, NOW())
+		ON CONFLICT (jalali_year)
+		DO UPDATE SET
+			last_number = letter_number_counters.last_number + 1,
+			updated_at = NOW()
+		RETURNING last_number
+	`
+
+	var number int64
+	if err := r.db.QueryRow(ctx, query, jalaliYear).Scan(&number); err != nil {
+		return 0, fmt.Errorf("failed to get next yearly letter number: %w", err)
+	}
+
+	return number, nil
+}
+
 func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 	const query = `
 		INSERT INTO letters (
 			letter_number,
+			letter_year,
+			letter_year_suffix,
+			letter_serial,
 			title,
 			letter_date,
 			registrar_name,
@@ -48,7 +74,7 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 			created_by,
 			is_deleted
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, false)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10, $11, false)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -56,6 +82,9 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 		ctx,
 		query,
 		l.LetterNumber,
+		l.LetterYear,
+		l.LetterYearSuffix,
+		l.LetterSerial,
 		l.Title,
 		l.LetterDate,
 		l.RegistrarName,
@@ -77,6 +106,9 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 		SELECT
 			id,
 			letter_number,
+			letter_year,
+			letter_year_suffix,
+			letter_serial,
 			title,
 			letter_date,
 			registrar_name,
@@ -100,6 +132,9 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&l.ID,
 		&l.LetterNumber,
+		&l.LetterYear,
+		&l.LetterYearSuffix,
+		&l.LetterSerial,
 		&l.Title,
 		&l.LetterDate,
 		&l.RegistrarName,
@@ -203,6 +238,9 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 	SELECT
 		id,
 		letter_number,
+		letter_year,
+		letter_year_suffix,
+		letter_serial,
 		title,
 		letter_date,
 		registrar_name,
@@ -218,7 +256,7 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 		deleted_at
 	FROM letters
 	%s
-	ORDER BY letter_number DESC
+	ORDER BY created_at DESC
 	LIMIT $%d OFFSET $%d
 `, where, argPos, argPos+1)
 
@@ -238,6 +276,9 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 		if err := rows.Scan(
 			&l.ID,
 			&l.LetterNumber,
+			&l.LetterYear,
+			&l.LetterYearSuffix,
+			&l.LetterSerial,
 			&l.Title,
 			&l.LetterDate,
 			&l.RegistrarName,

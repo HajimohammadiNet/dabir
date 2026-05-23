@@ -2,6 +2,7 @@ package letters
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
@@ -13,6 +14,10 @@ type LetterDTO struct {
 	ID                    string `json:"id"`
 	LetterNumber          int64  `json:"letter_number"`
 	FormattedLetterNumber string `json:"formatted_letter_number"`
+
+	LetterYear       *int    `json:"letter_year,omitempty"`
+	LetterYearSuffix *string `json:"letter_year_suffix,omitempty"`
+	LetterSerial     *int64  `json:"letter_serial,omitempty"`
 
 	Title            string `json:"title"`
 	LetterDate       string `json:"letter_date"`
@@ -57,7 +62,11 @@ func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 	return LetterDTO{
 		ID:                    l.ID,
 		LetterNumber:          l.LetterNumber,
-		FormattedLetterNumber: FormatLetterNumber(l.LetterNumber, cfg),
+		FormattedLetterNumber: FormatLetterNumber(l, cfg),
+
+		LetterYear:       l.LetterYear,
+		LetterYearSuffix: l.LetterYearSuffix,
+		LetterSerial:     l.LetterSerial,
 
 		Title:            l.Title,
 		LetterDate:       l.LetterDate.Format("2006-01-02"),
@@ -78,7 +87,30 @@ func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 	}
 }
 
-func FormatLetterNumber(number int64, cfg LetterNumberConfig) string {
+func FormatLetterNumber(l letter.Letter, cfg LetterNumberConfig) string {
+	if cfg.Mode == NumberingModeJalaliYearly && l.LetterSerial != nil {
+		separator := cfg.YearlySeparator
+		if separator == "" {
+			separator = "-"
+		}
+
+		serialPadding := cfg.YearlySerialPadding
+		if serialPadding <= 0 {
+			serialPadding = 4
+		}
+
+		yearSuffix := ""
+		if l.LetterYearSuffix != nil && *l.LetterYearSuffix != "" {
+			yearSuffix = *l.LetterYearSuffix
+		} else if l.LetterYear != nil {
+			yearSuffix = BuildJalaliYearSuffix(*l.LetterYear, cfg.YearlyPrefixDigits)
+		}
+
+		if yearSuffix != "" {
+			return fmt.Sprintf("%s%s%0*d", yearSuffix, separator, serialPadding, *l.LetterSerial)
+		}
+	}
+
 	padding := cfg.Padding
 	if padding <= 0 {
 		padding = 6
@@ -89,5 +121,16 @@ func FormatLetterNumber(number int64, cfg LetterNumberConfig) string {
 		prefix = "DABIR"
 	}
 
-	return fmt.Sprintf("%s-%0*d", prefix, padding, number)
+	return fmt.Sprintf("%s-%0*d", prefix, padding, l.LetterNumber)
+}
+
+func BuildJalaliYearSuffix(jalaliYear int, digits int) string {
+	if digits <= 0 {
+		digits = 3
+	}
+
+	divisor := int(math.Pow10(digits))
+	suffix := jalaliYear % divisor
+
+	return fmt.Sprintf("%0*d", digits, suffix)
 }

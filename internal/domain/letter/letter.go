@@ -6,6 +6,10 @@ type Letter struct {
 	ID           string
 	LetterNumber int64
 
+	LetterYear       *int
+	LetterYearSuffix *string
+	LetterSerial     *int64
+
 	Title      string
 	LetterDate time.Time
 

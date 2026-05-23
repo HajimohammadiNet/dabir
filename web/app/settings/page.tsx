@@ -48,6 +48,8 @@ export default function SettingsPage() {
     void load();
   }, [loadSettings]);
 
+  const letterConfig = settings?.letter_config;
+
   return (
     <ProtectedRoute allowedRoles={["superuser"]}>
       <AppShell>
@@ -93,30 +95,64 @@ export default function SettingsPage() {
 
             <CardContent className="space-y-4">
               <InfoRow
-                label={t.numberPrefix}
-                value={settings?.letter_config.number_prefix || "-"}
-              />
-
-              <InfoRow
-                label={t.numberPadding}
+                label={t.numberingMode}
                 value={
-                  settings
-                    ? String(settings.letter_config.number_padding)
+                  letterConfig
+                    ? formatNumberingMode(letterConfig.numbering_mode, t)
                     : "-"
                 }
               />
 
-              {settings ? (
+              {letterConfig?.numbering_mode === "fixed_prefix" ? (
+                <>
+                  <InfoRow
+                    label={t.numberPrefix}
+                    value={letterConfig.number_prefix || "-"}
+                  />
+
+                  <InfoRow
+                    label={t.numberPadding}
+                    value={String(letterConfig.number_padding)}
+                  />
+                </>
+              ) : null}
+
+              {letterConfig?.numbering_mode === "jalali_yearly" ? (
+                <>
+                  <InfoRow
+                    label={t.yearlySerialPadding}
+                    value={String(letterConfig.yearly_serial_padding)}
+                  />
+
+                  <InfoRow
+                    label={t.yearlySeparator}
+                    value={letterConfig.yearly_separator || "-"}
+                  />
+
+                  <InfoRow
+                    label={t.yearSource}
+                    value={
+                      letterConfig.year_source === "created_at"
+                        ? t.yearSourceCreatedAt
+                        : t.yearSourceLetterDate
+                    }
+                  />
+
+                  <InfoRow
+                    label={t.numberPrefix}
+                    value={String(letterConfig.yearly_prefix_digits)}
+                  />
+                </>
+              ) : null}
+
+              {letterConfig ? (
                 <div className="rounded-lg border bg-muted/30 p-4">
                   <div className="text-sm text-muted-foreground">
                     {t.exampleFormattedNumber}
                   </div>
                   <div className="mt-2">
-                    <Badge variant="secondary" className="text-base">
-                      {formatExample(
-                        settings.letter_config.number_prefix,
-                        settings.letter_config.number_padding
-                      )}
+                    <Badge variant="secondary" className="text-base" dir="ltr">
+                      {formatExample(letterConfig)}
                     </Badge>
                   </div>
                 </div>
@@ -131,14 +167,36 @@ export default function SettingsPage() {
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b py-3 last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b py-3 last:border-b-0">
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="font-medium">{value}</div>
+      <div className="font-medium text-end" dir="auto">
+        {value}
+      </div>
     </div>
   );
 }
 
-function formatExample(prefix: string, padding: number) {
-  const number = "1".padStart(padding || 6, "0");
-  return `${prefix || "DABIR"}-${number}`;
+function formatNumberingMode(
+  mode: PublicSettings["letter_config"]["numbering_mode"],
+  t: ReturnType<typeof useI18n>["t"]
+) {
+  if (mode === "jalali_yearly") {
+    return t.jalaliYearlyNumbering;
+  }
+
+  return t.fixedPrefixNumbering;
+}
+
+function formatExample(config: PublicSettings["letter_config"]) {
+  if (config.numbering_mode === "jalali_yearly") {
+    const separator = config.yearly_separator || "-";
+    const serialPadding = config.yearly_serial_padding || 4;
+
+    return `405${separator}${"1".padStart(serialPadding, "0")}`;
+  }
+
+  const prefix = config.number_prefix || "DABIR";
+  const padding = config.number_padding || 6;
+
+  return `${prefix}-${"1".padStart(padding, "0")}`;
 }

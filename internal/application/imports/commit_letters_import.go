@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
@@ -81,15 +82,26 @@ func (uc *CommitLettersImportUseCase) Execute(ctx context.Context, input CommitL
 			return nil, fmt.Errorf("invalid parsed letter date at row %d: %w", row.RowNumber, err)
 		}
 
+		displayNumber := strings.TrimSpace(row.DisplayLetterNumber)
+		if displayNumber == "" {
+			return nil, fmt.Errorf("display letter number is required at row %d", row.RowNumber)
+		}
+
+		internalNumber, err := uc.letterRepo.NextNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate internal letter number at row %d: %w", row.RowNumber, err)
+		}
+
 		letters = append(letters, letter.Letter{
-			LetterNumber:  row.LetterNumber,
-			Title:         row.Title,
-			LetterDate:    letterDate,
-			RegistrarName: input.RegistrarName,
-			Sender:        row.Sender,
-			Receiver:      row.Receiver,
-			CreatedBy:     input.ActorUserID,
-			IsDeleted:     false,
+			LetterNumber:        internalNumber,
+			DisplayLetterNumber: &displayNumber,
+			Title:               row.Title,
+			LetterDate:          letterDate,
+			RegistrarName:       input.RegistrarName,
+			Sender:              row.Sender,
+			Receiver:            row.Receiver,
+			CreatedBy:           input.ActorUserID,
+			IsDeleted:           false,
 		})
 	}
 
@@ -97,17 +109,17 @@ func (uc *CommitLettersImportUseCase) Execute(ctx context.Context, input CommitL
 		return nil, err
 	}
 
-	if job.MaxLetterNumber != nil {
-		if err := uc.letterRepo.SetSequenceValue(ctx, *job.MaxLetterNumber); err != nil {
-			return nil, err
-		}
-	}
+	//if job.MaxLetterNumber != nil {
+	//	if err := uc.letterRepo.SetSequenceValue(ctx, *job.MaxLetterNumber); err != nil {
+	//		return nil, err
+	//	}
+	//}
 
 	if err := uc.importRepo.MarkCommitted(ctx, job.ID, input.ActorUserID); err != nil {
 		return nil, err
 	}
 
-	nextLetterNumber := int64(1)
+	nextLetterNumber := int64(0)
 	if job.MaxLetterNumber != nil {
 		nextLetterNumber = *job.MaxLetterNumber + 1
 	}

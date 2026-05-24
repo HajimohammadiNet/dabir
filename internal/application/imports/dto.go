@@ -16,7 +16,9 @@ type ImportErrorDTO struct {
 type ImportedLetterRow struct {
 	RowNumber int `json:"row_number"`
 
-	LetterNumber     int64  `json:"letter_number"`
+	LetterNumber        int64  `json:"letter_number"`
+	DisplayLetterNumber string `json:"display_letter_number"`
+
 	Title            string `json:"title"`
 	LetterDate       string `json:"letter_date"`
 	LetterDateJalali string `json:"letter_date_jalali"`

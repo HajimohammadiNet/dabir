@@ -13,6 +13,8 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+//const incomingSheetName = "دریافتی"
+
 type LetterExcelParser struct{}
 
 type ParseLettersResult struct {
@@ -77,22 +79,12 @@ func (p *LetterExcelParser) Parse(fileName string, reader io.Reader) (*ParseLett
 	}
 	defer f.Close()
 
-	sheets := f.GetSheetList()
-	if len(sheets) == 0 {
-		return nil, errors.New("excel file does not contain any sheets")
-	}
-
-	rows, err := f.GetRows(sheets[0])
+	sheetName, rows, columnIndex, detectedColumns, err := findImportableSheet(f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read excel rows: %w", err)
+		return nil, err
 	}
 
-	if len(rows) < 2 {
-		return nil, errors.New("excel file must contain header row and at least one data row")
-	}
-
-	header := rows[0]
-	columnIndex, detectedColumns := detectColumns(header)
+	_ = sheetName
 
 	result := &ParseLettersResult{
 		DetectedColumns: detectedColumns,
@@ -100,7 +92,7 @@ func (p *LetterExcelParser) Parse(fileName string, reader io.Reader) (*ParseLett
 		Errors:          make([]ImportErrorDTO, 0),
 	}
 
-	required := []string{"letter_number", "title", "letter_date", "sender", "receiver"}
+	required := []string{"letter_number", "letter_date"}
 	for _, field := range required {
 		if _, ok := columnIndex[field]; !ok {
 			result.Errors = append(result.Errors, ImportErrorDTO{
@@ -116,8 +108,6 @@ func (p *LetterExcelParser) Parse(fileName string, reader io.Reader) (*ParseLett
 		result.TotalRows = len(rows) - 1
 		return result, nil
 	}
-
-	var maxNumber int64
 
 	for i := 1; i < len(rows); i++ {
 		excelRowNumber := i + 1
@@ -136,19 +126,53 @@ func (p *LetterExcelParser) Parse(fileName string, reader io.Reader) (*ParseLett
 			continue
 		}
 
-		if parsedRow.LetterNumber > maxNumber {
-			maxNumber = parsedRow.LetterNumber
-		}
-
 		result.ValidRows++
 		result.Rows = append(result.Rows, parsedRow)
 	}
 
-	if maxNumber > 0 {
-		result.MaxLetterNumber = &maxNumber
+	return result, nil
+}
+
+func findImportableSheet(f *excelize.File) (string, [][]string, map[string]int, map[string]string, error) {
+	sheets := f.GetSheetList()
+
+	if len(sheets) == 0 {
+		return "", nil, nil, nil, errors.New("excel file has no sheets")
 	}
 
-	return result, nil
+	var lastError error
+
+	for _, sheet := range sheets {
+		rows, err := f.GetRows(sheet)
+		if err != nil {
+			lastError = fmt.Errorf("failed to read excel rows from sheet %q: %w", sheet, err)
+			continue
+		}
+
+		if len(rows) < 2 {
+			continue
+		}
+
+		header := rows[0]
+		columnIndex, detectedColumns := detectColumns(header)
+
+		if hasRequiredImportColumns(columnIndex) {
+			return sheet, rows, columnIndex, detectedColumns, nil
+		}
+	}
+
+	if lastError != nil {
+		return "", nil, nil, nil, lastError
+	}
+
+	return "", nil, nil, nil, errors.New("no importable sheet found: required columns are letter number and letter date")
+}
+
+func hasRequiredImportColumns(columnIndex map[string]int) bool {
+	_, hasNumber := columnIndex["letter_number"]
+	_, hasDate := columnIndex["letter_date"]
+
+	return hasNumber && hasDate
 }
 
 func detectColumns(header []string) (map[string]int, map[string]string) {
@@ -186,30 +210,29 @@ func normalizeHeader(value string) string {
 	value = strings.ReplaceAll(value, "-", "")
 	value = strings.ReplaceAll(value, " ", "")
 	value = strings.ReplaceAll(value, "‌", "")
+	value = strings.ReplaceAll(value, "\u200c", "")
 	return value
 }
 
 func parseLetterRow(rowNumber int, row []string, columnIndex map[string]int) (ImportedLetterRow, []ImportErrorDTO) {
 	errorsList := make([]ImportErrorDTO, 0)
 
-	letterNumberRaw := getCell(row, columnIndex["letter_number"])
-	title := strings.TrimSpace(getCell(row, columnIndex["title"]))
+	displayLetterNumber := strings.TrimSpace(getCell(row, columnIndex["letter_number"]))
 	dateRaw := strings.TrimSpace(getCell(row, columnIndex["letter_date"]))
-	sender := strings.TrimSpace(getCell(row, columnIndex["sender"]))
-	receiver := strings.TrimSpace(getCell(row, columnIndex["receiver"]))
 
-	letterNumber, err := parseLetterNumber(letterNumberRaw)
-	if err != nil {
+	title := getOptionalCell(row, columnIndex, "title")
+	sender := getOptionalCell(row, columnIndex, "sender")
+	receiver := getOptionalCell(row, columnIndex, "receiver")
+
+	if displayLetterNumber == "" {
 		errorsList = append(errorsList, ImportErrorDTO{
 			Row:     rowNumber,
-			Field:   "letter_number",
-			Message: err.Error(),
+			Field:   "display_letter_number",
+			Message: "letter number is required",
 		})
 	}
 
 	letterDate, err := parseExcelDate(dateRaw)
-	parsedGregorianDate, _ := time.Parse("2006-01-02", letterDate)
-	letterDateJalali := dateutil.ToJalaliString(parsedGregorianDate)
 	if err != nil {
 		errorsList = append(errorsList, ImportErrorDTO{
 			Row:     rowNumber,
@@ -219,42 +242,46 @@ func parseLetterRow(rowNumber int, row []string, columnIndex map[string]int) (Im
 	}
 
 	if title == "" {
-		errorsList = append(errorsList, ImportErrorDTO{
-			Row:     rowNumber,
-			Field:   "title",
-			Message: "title is required",
-		})
+		title = "بدون موضوع"
 	}
 
 	if sender == "" {
-		errorsList = append(errorsList, ImportErrorDTO{
-			Row:     rowNumber,
-			Field:   "sender",
-			Message: "sender is required",
-		})
+		sender = "-"
 	}
 
 	if receiver == "" {
-		errorsList = append(errorsList, ImportErrorDTO{
-			Row:     rowNumber,
-			Field:   "receiver",
-			Message: "receiver is required",
-		})
+		receiver = "-"
 	}
 
 	if len(errorsList) > 0 {
 		return ImportedLetterRow{}, errorsList
 	}
 
+	parsedGregorianDate, err := time.Parse("2006-01-02", letterDate)
+	letterDateJalali := ""
+	if err == nil {
+		letterDateJalali = dateutil.ToJalaliString(parsedGregorianDate)
+	}
+
 	return ImportedLetterRow{
-		RowNumber:        rowNumber,
-		LetterNumber:     letterNumber,
-		Title:            title,
-		LetterDate:       letterDate,
-		LetterDateJalali: letterDateJalali,
-		Sender:           sender,
-		Receiver:         receiver,
-	}, nil
+		RowNumber:           rowNumber,
+		LetterNumber:        int64(rowNumber),
+		DisplayLetterNumber: displayLetterNumber,
+		Title:               title,
+		LetterDate:          letterDate,
+		LetterDateJalali:    letterDateJalali,
+		Sender:              sender,
+		Receiver:            receiver,
+	}, errorsList
+}
+
+func getOptionalCell(row []string, columnIndex map[string]int, field string) string {
+	index, ok := columnIndex[field]
+	if !ok {
+		return ""
+	}
+
+	return getCell(row, index)
 }
 
 func getCell(row []string, index int) string {
@@ -265,34 +292,22 @@ func getCell(row []string, index int) string {
 	return strings.TrimSpace(row[index])
 }
 
-func parseLetterNumber(value string) (int64, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, errors.New("letter number is required")
-	}
-
-	value = strings.ReplaceAll(value, ",", "")
-	value = strings.ReplaceAll(value, " ", "")
-
-	number, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return 0, errors.New("letter number must be numeric")
-	}
-
-	if number <= 0 {
-		return 0, errors.New("letter number must be greater than zero")
-	}
-
-	return number, nil
-}
-
 func parseExcelDate(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return "", errors.New("letter date is required")
 	}
 
+	value = dateutil.NormalizeDigits(value)
+	value = strings.ReplaceAll(value, "\\", "/")
+	value = strings.ReplaceAll(value, "-", "/")
+	value = strings.ReplaceAll(value, ".", "/")
+
 	if parsed, err := dateutil.ParseOfficialDate(value); err == nil {
+		return parsed.Format("2006-01-02"), nil
+	}
+
+	if parsed, ok := parseCompactJalaliDate(value); ok {
 		return parsed.Format("2006-01-02"), nil
 	}
 
@@ -301,6 +316,8 @@ func parseExcelDate(value string) (string, error) {
 		"2006/01/02",
 		"02/01/2006",
 		"02-01-2006",
+		"1/2/2006",
+		"2006/1/2",
 	}
 
 	for _, layout := range formats {
@@ -317,7 +334,75 @@ func parseExcelDate(value string) (string, error) {
 		}
 	}
 
-	return "", errors.New("invalid date format, expected Jalali YYYY/MM/DD")
+	return "", errors.New("invalid date format")
+}
+
+func parseCompactJalaliDate(value string) (time.Time, bool) {
+	cleaned := strings.TrimSpace(value)
+	cleaned = strings.ReplaceAll(cleaned, "/", "")
+	cleaned = strings.ReplaceAll(cleaned, " ", "")
+
+	if len(cleaned) != 6 && len(cleaned) != 8 {
+		return time.Time{}, false
+	}
+
+	if _, err := strconv.Atoi(cleaned); err != nil {
+		return time.Time{}, false
+	}
+
+	var year int
+	var month int
+	var day int
+	var err error
+
+	if len(cleaned) == 6 {
+		year, err = strconv.Atoi(cleaned[0:2])
+		if err != nil {
+			return time.Time{}, false
+		}
+
+		if year >= 90 {
+			year += 1300
+		} else {
+			year += 1400
+		}
+
+		month, err = strconv.Atoi(cleaned[2:4])
+		if err != nil {
+			return time.Time{}, false
+		}
+
+		day, err = strconv.Atoi(cleaned[4:6])
+		if err != nil {
+			return time.Time{}, false
+		}
+	} else {
+		year, err = strconv.Atoi(cleaned[0:4])
+		if err != nil {
+			return time.Time{}, false
+		}
+
+		month, err = strconv.Atoi(cleaned[4:6])
+		if err != nil {
+			return time.Time{}, false
+		}
+
+		day, err = strconv.Atoi(cleaned[6:8])
+		if err != nil {
+			return time.Time{}, false
+		}
+	}
+
+	if month < 1 || month > 12 || day < 1 || day > 31 {
+		return time.Time{}, false
+	}
+
+	gYear, gMonth, gDay, err := dateutil.JalaliToGregorian(year, month, day)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	return time.Date(gYear, time.Month(gMonth), gDay, 0, 0, 0, 0, time.UTC), true
 }
 
 func isEmptyRow(row []string) bool {

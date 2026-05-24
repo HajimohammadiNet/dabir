@@ -7,6 +7,7 @@ export type ImportError = {
 export type ImportedLetterRow = {
   row_number: number;
   letter_number: number;
+  display_letter_number?: string | null;
   title: string;
   letter_date: string;
   letter_date_jalali?: string;

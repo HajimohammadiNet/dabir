@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
 	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
@@ -115,51 +116,55 @@ func (uc *PreviewLettersImportUseCase) Execute(ctx context.Context, input Previe
 }
 
 func (uc *PreviewLettersImportUseCase) validateDuplicates(ctx context.Context, result *ParseLettersResult) error {
-	seen := make(map[int64]int)
-	numbers := make([]int64, 0, len(result.Rows))
+	seen := make(map[string]int)
 
 	validRows := make([]ImportedLetterRow, 0, len(result.Rows))
 	invalidRowNumbers := collectInvalidRows(result.Errors)
 
 	for _, row := range result.Rows {
-		if firstRow, exists := seen[row.LetterNumber]; exists {
+		displayNumber := strings.TrimSpace(row.DisplayLetterNumber)
+		if displayNumber == "" {
 			result.Errors = append(result.Errors, ImportErrorDTO{
 				Row:     row.RowNumber,
-				Field:   "letter_number",
-				Message: fmt.Sprintf("duplicate letter number in file, first seen at row %d", firstRow),
+				Field:   "display_letter_number",
+				Message: "display letter number is required",
 			})
 			invalidRowNumbers[row.RowNumber] = true
 			continue
 		}
 
-		seen[row.LetterNumber] = row.RowNumber
-		numbers = append(numbers, row.LetterNumber)
+		if firstRow, exists := seen[displayNumber]; exists {
+			result.Errors = append(result.Errors, ImportErrorDTO{
+				Row:     row.RowNumber,
+				Field:   "display_letter_number",
+				Message: fmt.Sprintf("duplicate display letter number in file, first seen at row %d", firstRow),
+			})
+			invalidRowNumbers[row.RowNumber] = true
+			continue
+		}
+
+		seen[displayNumber] = row.RowNumber
+
+		exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, displayNumber)
+		if err != nil {
+			return err
+		}
+
+		if exists {
+			result.Errors = append(result.Errors, ImportErrorDTO{
+				Row:     row.RowNumber,
+				Field:   "display_letter_number",
+				Message: "display letter number already exists in database",
+			})
+			invalidRowNumbers[row.RowNumber] = true
+			continue
+		}
+
 		validRows = append(validRows, row)
 	}
 
-	existingNumbers, err := uc.letterRepo.FindExistingNumbers(ctx, numbers)
-	if err != nil {
-		return err
-	}
-
-	finalRows := make([]ImportedLetterRow, 0, len(validRows))
-
-	for _, row := range validRows {
-		if existingNumbers[row.LetterNumber] {
-			result.Errors = append(result.Errors, ImportErrorDTO{
-				Row:     row.RowNumber,
-				Field:   "letter_number",
-				Message: "letter number already exists in database",
-			})
-			invalidRowNumbers[row.RowNumber] = true
-			continue
-		}
-
-		finalRows = append(finalRows, row)
-	}
-
-	result.Rows = finalRows
-	result.ValidRows = len(finalRows)
+	result.Rows = validRows
+	result.ValidRows = len(validRows)
 	result.InvalidRows = len(invalidRowNumbers)
 
 	return nil

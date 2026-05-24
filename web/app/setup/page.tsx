@@ -115,16 +115,32 @@ export default function SetupPage() {
     return `${yearSuffix}${separator}${"1".padStart(padding, "0")}`;
   }
 
+  function manualExample() {
+    return "405-158";
+  }
+
+  function selectedExample() {
+    if (numberingMode === "manual") {
+      return manualExample();
+    }
+
+    if (numberingMode === "jalali_yearly") {
+      return jalaliYearlyExample();
+    }
+
+    return fixedPrefixExample();
+  }
+
   if (checking) {
     return (
-      <main className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+      <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         {t.commonLoading}
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-3xl">
         <CardHeader>
           <CardTitle>{t.setupDabir}</CardTitle>
@@ -213,7 +229,7 @@ export default function SetupPage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setNumberingMode("fixed_prefix")}
@@ -265,6 +281,30 @@ export default function SetupPage() {
                     {jalaliYearlyExample()}
                   </div>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setNumberingMode("manual")}
+                  className={[
+                    "rounded-xl border p-4 text-start transition-colors",
+                    numberingMode === "manual"
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-muted",
+                  ].join(" ")}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold">{t.manualNumbering}</div>
+                    {numberingMode === "manual" ? (
+                      <Badge>{t.commonActive}</Badge>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t.manualNumberingDescription}
+                  </p>
+                  <div className="mt-3 font-mono text-lg" dir="ltr">
+                    {manualExample()}
+                  </div>
+                </button>
               </div>
 
               {numberingMode === "fixed_prefix" ? (
@@ -296,7 +336,9 @@ export default function SetupPage() {
                     />
                   </div>
                 </div>
-              ) : (
+              ) : null}
+
+              {numberingMode === "jalali_yearly" ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="yearly_serial_padding">
@@ -344,7 +386,9 @@ export default function SetupPage() {
                       <option value="letter_date">
                         {t.yearSourceLetterDate}
                       </option>
-                      <option value="created_at">{t.yearSourceCreatedAt}</option>
+                      <option value="created_at">
+                        {t.yearSourceCreatedAt}
+                      </option>
                     </select>
                   </div>
 
@@ -366,14 +410,18 @@ export default function SetupPage() {
                     />
                   </div>
                 </div>
-              )}
+              ) : null}
+
+              {numberingMode === "manual" ? (
+                <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  {t.manualNumberingDescription}
+                </div>
+              ) : null}
 
               <div className="rounded-md border bg-muted/30 p-3 text-sm">
                 {t.example}:{" "}
                 <span className="font-medium" dir="ltr">
-                  {numberingMode === "fixed_prefix"
-                    ? fixedPrefixExample()
-                    : jalaliYearlyExample()}
+                  {selectedExample()}
                 </span>
               </div>
             </section>

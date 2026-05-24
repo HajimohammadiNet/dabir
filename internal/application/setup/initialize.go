@@ -201,7 +201,8 @@ func validateInitializeInput(input InitializeInput) error {
 	}
 
 	if input.LetterConfig.NumberingMode != "fixed_prefix" &&
-		input.LetterConfig.NumberingMode != "jalali_yearly" {
+		input.LetterConfig.NumberingMode != "jalali_yearly" &&
+		input.LetterConfig.NumberingMode != "manual" {
 		return errors.New("invalid numbering_mode")
 	}
 

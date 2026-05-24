@@ -154,6 +154,11 @@ export const dictionaries = {
     yearSource: "Year Source",
     yearSourceLetterDate: "Letter Date",
     yearSourceCreatedAt: "Created At",
+
+    manualNumbering: "Manual Numbering",
+    manualNumberingDescription: "Users enter the letter number manually. The system only checks for duplicates.",
+    displayLetterNumber: "Letter Number",
+    lastLetterNumber: "Last Letter Number",
   },
 
   fa: {
@@ -309,5 +314,10 @@ export const dictionaries = {
     yearSource: "مبنای سال شماره",
     yearSourceLetterDate: "تاریخ نامه",
     yearSourceCreatedAt: "زمان ثبت",
+
+    manualNumbering: "شماره‌گذاری دستی",
+    manualNumberingDescription: "کاربر شماره نامه را دستی وارد می‌کند و سیستم فقط تکراری نبودن آن را بررسی می‌کند.",
+    displayLetterNumber: "شماره نامه",
+    lastLetterNumber: "آخرین شماره نامه",
   },
 } as const;

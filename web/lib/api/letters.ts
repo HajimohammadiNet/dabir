@@ -37,6 +37,7 @@ export async function listLetters(
 }
 
 export type CreateLetterInput = {
+  display_letter_number?: string | null;
   title: string;
   letter_date: string;
   sender: string;

@@ -2,6 +2,11 @@ export type Letter = {
   id: string;
   letter_number: number;
   formatted_letter_number: string;
+  display_letter_number?: string | null;
+
+  letter_year?: number | null;
+  letter_year_suffix?: string | null;
+  letter_serial?: number | null;
 
   title: string;
   letter_date: string;

@@ -41,11 +41,13 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    const load = async () => {
-      await loadSettings();
-    };
+    const timeoutID = window.setTimeout(() => {
+      void loadSettings();
+    }, 0);
 
-    void load();
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
   }, [loadSettings]);
 
   const letterConfig = settings?.letter_config;
@@ -145,6 +147,13 @@ export default function SettingsPage() {
                 </>
               ) : null}
 
+              {letterConfig?.numbering_mode === "manual" ? (
+                <InfoRow
+                  label={t.manualNumbering}
+                  value={t.manualNumberingDescription}
+                />
+              ) : null}
+
               {letterConfig ? (
                 <div className="rounded-lg border bg-muted/30 p-4">
                   <div className="text-sm text-muted-foreground">
@@ -180,6 +189,10 @@ function formatNumberingMode(
   mode: PublicSettings["letter_config"]["numbering_mode"],
   t: ReturnType<typeof useI18n>["t"]
 ) {
+  if (mode === "manual") {
+    return t.manualNumbering;
+  }
+
   if (mode === "jalali_yearly") {
     return t.jalaliYearlyNumbering;
   }
@@ -188,6 +201,10 @@ function formatNumberingMode(
 }
 
 function formatExample(config: PublicSettings["letter_config"]) {
+  if (config.numbering_mode === "manual") {
+    return "405-158";
+  }
+
   if (config.numbering_mode === "jalali_yearly") {
     const separator = config.yearly_separator || "-";
     const serialPadding = config.yearly_serial_padding || 4;

@@ -1,15 +1,17 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/contexts/auth-context";
-import { createLetter } from "@/lib/api/letters";
+import { createLetter, listLetters } from "@/lib/api/letters";
+import { getPublicSettings } from "@/lib/api/settings";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import type { Letter } from "@/types/letter";
+import type { NumberingMode } from "@/types/settings";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +38,11 @@ export default function NewLetterPage() {
   const { token } = useAuth();
   const { t } = useI18n();
 
+  const [numberingMode, setNumberingMode] =
+    useState<NumberingMode>("fixed_prefix");
+  const [lastLetterNumber, setLastLetterNumber] = useState<string | null>(null);
+
+  const [displayLetterNumber, setDisplayLetterNumber] = useState("");
   const [title, setTitle] = useState("");
   const [letterDate, setLetterDate] = useState("");
   const [sender, setSender] = useState("");
@@ -46,15 +53,56 @@ export default function NewLetterPage() {
   const [createdLetter, setCreatedLetter] = useState<Letter | null>(null);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
 
+  const loadPageData = useCallback(async () => {
+    try {
+      const settings = await getPublicSettings();
+      setNumberingMode(settings.letter_config.numbering_mode);
+
+      if (token) {
+        const lettersResult = await listLetters(token, {
+          page: 1,
+          page_size: 1,
+        });
+
+        if (lettersResult.items.length > 0) {
+          setLastLetterNumber(lettersResult.items[0].formatted_letter_number);
+        } else {
+          setLastLetterNumber(null);
+        }
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load letter settings"
+      );
+    }
+  }, [token]);
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(() => {
+      void loadPageData();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [loadPageData]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!token) return;
 
+    if (numberingMode === "manual" && displayLetterNumber.trim() === "") {
+      toast.error("Letter number is required in manual numbering mode");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const letter = await createLetter(token, {
+        display_letter_number:
+          numberingMode === "manual" ? displayLetterNumber.trim() : null,
         title,
         letter_date: letterDate,
         sender,
@@ -64,6 +112,7 @@ export default function NewLetterPage() {
 
       setCreatedLetter(letter);
       setResultDialogOpen(true);
+      setLastLetterNumber(letter.formatted_letter_number);
 
       toast.success(`${letter.formatted_letter_number} ثبت شد`);
     } catch (err) {
@@ -74,6 +123,7 @@ export default function NewLetterPage() {
   }
 
   function resetForm() {
+    setDisplayLetterNumber("");
     setTitle("");
     setLetterDate("");
     setSender("");
@@ -94,6 +144,40 @@ export default function NewLetterPage() {
             <p className="text-muted-foreground">{t.lettersDescription}</p>
           </div>
 
+          {numberingMode === "manual" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.manualNumbering}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <div className="text-sm text-muted-foreground">
+                    {t.lastLetterNumber}
+                  </div>
+                  <div className="mt-1 text-2xl font-bold" dir="ltr">
+                    {lastLetterNumber || "-"}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="display_letter_number">
+                    {t.displayLetterNumber}
+                  </Label>
+                  <Input
+                    id="display_letter_number"
+                    value={displayLetterNumber}
+                    onChange={(event) =>
+                      setDisplayLetterNumber(event.target.value)
+                    }
+                    required
+                    dir="ltr"
+                    placeholder="405-158"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>{t.letterInformation}</CardTitle>
@@ -113,12 +197,12 @@ export default function NewLetterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="letter_date">{t.letterDate}</Label>
-                    <JalaliDatePicker
-                        id="letter_date"
-                        value={letterDate}
-                        onChange={setLetterDate}
-                        required
-                    />
+                  <JalaliDatePicker
+                    id="letter_date"
+                    value={letterDate}
+                    onChange={setLetterDate}
+                    required
+                  />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -179,7 +263,7 @@ export default function NewLetterPage() {
               <DialogHeader>
                 <DialogTitle>نامه با موفقیت ثبت شد</DialogTitle>
                 <DialogDescription>
-                  شماره نامه تولیدشده و اطلاعات ثبت‌شده در ادامه نمایش داده شده است.
+                  شماره نامه و اطلاعات ثبت‌شده در ادامه نمایش داده شده است.
                 </DialogDescription>
               </DialogHeader>
 

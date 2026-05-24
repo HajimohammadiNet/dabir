@@ -3,7 +3,7 @@ export type SetupStatus = {
   setup_needed: boolean;
 };
 
-export type NumberingMode = "fixed_prefix" | "jalali_yearly";
+export type NumberingMode = "fixed_prefix" | "jalali_yearly" | "manual";
 export type YearSource = "letter_date" | "created_at";
 
 export type InitializeSetupInput = {

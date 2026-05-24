@@ -3,6 +3,7 @@ package letters
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
@@ -14,6 +15,8 @@ type LetterDTO struct {
 	ID                    string `json:"id"`
 	LetterNumber          int64  `json:"letter_number"`
 	FormattedLetterNumber string `json:"formatted_letter_number"`
+
+	DisplayLetterNumber *string `json:"display_letter_number,omitempty"`
 
 	LetterYear       *int    `json:"letter_year,omitempty"`
 	LetterYearSuffix *string `json:"letter_year_suffix,omitempty"`
@@ -44,6 +47,7 @@ type NumberingMode string
 const (
 	NumberingModeFixedPrefix  NumberingMode = "fixed_prefix"
 	NumberingModeJalaliYearly NumberingMode = "jalali_yearly"
+	NumberingModeManual       NumberingMode = "manual"
 )
 
 type LetterNumberConfig struct {
@@ -63,6 +67,7 @@ func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 		ID:                    l.ID,
 		LetterNumber:          l.LetterNumber,
 		FormattedLetterNumber: FormatLetterNumber(l, cfg),
+		DisplayLetterNumber:   l.DisplayLetterNumber,
 
 		LetterYear:       l.LetterYear,
 		LetterYearSuffix: l.LetterYearSuffix,
@@ -88,6 +93,11 @@ func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 }
 
 func FormatLetterNumber(l letter.Letter, cfg LetterNumberConfig) string {
+
+	if l.DisplayLetterNumber != nil && strings.TrimSpace(*l.DisplayLetterNumber) != "" {
+		return strings.TrimSpace(*l.DisplayLetterNumber)
+	}
+
 	if cfg.Mode == NumberingModeJalaliYearly && l.LetterSerial != nil {
 		separator := cfg.YearlySeparator
 		if separator == "" {

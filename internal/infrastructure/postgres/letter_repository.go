@@ -57,10 +57,29 @@ func (r *LetterRepository) NextNumberForYear(ctx context.Context, jalaliYear int
 	return number, nil
 }
 
+func (r *LetterRepository) ExistsByDisplayLetterNumber(ctx context.Context, displayNumber string) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1
+			FROM letters
+			WHERE display_letter_number = $1
+			  AND is_deleted = false
+		)
+	`
+
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, displayNumber).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to check display letter number existence: %w", err)
+	}
+
+	return exists, nil
+}
+
 func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 	const query = `
 		INSERT INTO letters (
 			letter_number,
+			display_letter_number,
 			letter_year,
 			letter_year_suffix,
 			letter_serial,
@@ -74,7 +93,22 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 			created_by,
 			is_deleted
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10, $11, false)
+		VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6,
+			$7,
+			$8,
+			$9,
+			$10,
+			$11,
+			$12,
+			$13,
+			false
+		)
 		RETURNING id, created_at, updated_at
 	`
 
@@ -82,6 +116,7 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 		ctx,
 		query,
 		l.LetterNumber,
+		l.DisplayLetterNumber,
 		l.LetterYear,
 		l.LetterYearSuffix,
 		l.LetterSerial,
@@ -90,6 +125,7 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 		l.RegistrarName,
 		l.Sender,
 		l.Receiver,
+		l.Receiver, // destination backward compatibility
 		l.Description,
 		l.CreatedBy,
 	).Scan(&l.ID, &l.CreatedAt, &l.UpdatedAt)
@@ -106,6 +142,7 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 		SELECT
 			id,
 			letter_number,
+			display_letter_number,
 			letter_year,
 			letter_year_suffix,
 			letter_serial,
@@ -132,6 +169,7 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&l.ID,
 		&l.LetterNumber,
+		&l.DisplayLetterNumber,
 		&l.LetterYear,
 		&l.LetterYearSuffix,
 		&l.LetterSerial,
@@ -182,7 +220,8 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 
 	if filter.Search != "" {
 		where += fmt.Sprintf(
-			" AND (title ILIKE $%d OR sender ILIKE $%d OR receiver ILIKE $%d OR registrar_name ILIKE $%d OR CAST(letter_number AS TEXT) ILIKE $%d)",
+			" AND (title ILIKE $%d OR sender ILIKE $%d OR receiver ILIKE $%d OR registrar_name ILIKE $%d OR CAST(letter_number AS TEXT) ILIKE $%d OR display_letter_number ILIKE $%d)",
+			argPos,
 			argPos,
 			argPos,
 			argPos,
@@ -238,6 +277,7 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 	SELECT
 		id,
 		letter_number,
+		display_letter_number,
 		letter_year,
 		letter_year_suffix,
 		letter_serial,
@@ -276,6 +316,7 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 		if err := rows.Scan(
 			&l.ID,
 			&l.LetterNumber,
+			&l.DisplayLetterNumber,
 			&l.LetterYear,
 			&l.LetterYearSuffix,
 			&l.LetterSerial,
@@ -386,6 +427,7 @@ func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Lett
 	const query = `
 		INSERT INTO letters (
 			letter_number,
+			display_letter_number,
 			title,
 			letter_date,
 			registrar_name,
@@ -396,7 +438,7 @@ func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Lett
 			created_by,
 			is_deleted
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, false)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, false)
 	`
 
 	batch := &pgx.Batch{}
@@ -405,6 +447,7 @@ func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Lett
 		batch.Queue(
 			query,
 			l.LetterNumber,
+			l.DisplayLetterNumber,
 			l.Title,
 			l.LetterDate,
 			l.RegistrarName,

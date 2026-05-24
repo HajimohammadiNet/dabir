@@ -6,6 +6,8 @@ type Letter struct {
 	ID           string
 	LetterNumber int64
 
+	DisplayLetterNumber *string
+
 	LetterYear       *int
 	LetterYearSuffix *string
 	LetterSerial     *int64

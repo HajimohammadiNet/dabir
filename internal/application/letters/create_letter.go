@@ -25,6 +25,8 @@ type CreateLetterInput struct {
 	Title      string `json:"title"`
 	LetterDate string `json:"letter_date"`
 
+	DisplayLetterNumber *string `json:"display_letter_number"`
+
 	Sender   string `json:"sender"`
 	Receiver string `json:"receiver"`
 
@@ -72,7 +74,28 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		IsDeleted: false,
 	}
 
-	if cfg.Mode == NumberingModeJalaliYearly {
+	if cfg.Mode == NumberingModeManual {
+		if input.DisplayLetterNumber == nil || *input.DisplayLetterNumber == "" {
+			return nil, errors.New("display_letter_number is required in manual numbering mode")
+		}
+
+		exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, *input.DisplayLetterNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check display letter number uniqueness: %w", err)
+		}
+
+		if exists {
+			return nil, errors.New("display_letter_number already exists")
+		}
+
+		nextNumber, err := uc.letterRepo.NextNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate internal letter number: %w", err)
+		}
+
+		l.LetterNumber = nextNumber
+		l.DisplayLetterNumber = input.DisplayLetterNumber
+	} else if cfg.Mode == NumberingModeJalaliYearly {
 		jalaliYear := resolveJalaliYear(letterDate, cfg)
 		yearSuffix := BuildJalaliYearSuffix(jalaliYear, cfg.YearlyPrefixDigits)
 
@@ -109,6 +132,7 @@ func normalizeCreateLetterInput(input CreateLetterInput) CreateLetterInput {
 	input.Sender = strings.TrimSpace(input.Sender)
 	input.Receiver = strings.TrimSpace(input.Receiver)
 	input.RegistrarName = strings.TrimSpace(input.RegistrarName)
+	input.DisplayLetterNumber = normalizeOptionalString(input.DisplayLetterNumber)
 
 	if input.Description != nil {
 		desc := strings.TrimSpace(*input.Description)

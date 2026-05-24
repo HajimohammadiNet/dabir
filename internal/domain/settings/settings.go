@@ -19,6 +19,7 @@ type NumberingMode string
 const (
 	NumberingModeFixedPrefix  NumberingMode = "fixed_prefix"
 	NumberingModeJalaliYearly NumberingMode = "jalali_yearly"
+	NumberingModeManual       NumberingMode = "manual"
 )
 
 type YearSource string
@@ -62,7 +63,8 @@ func NormalizeLetterConfig(config LetterConfig) LetterConfig {
 	}
 
 	if config.NumberingMode != NumberingModeFixedPrefix &&
-		config.NumberingMode != NumberingModeJalaliYearly {
+		config.NumberingMode != NumberingModeJalaliYearly &&
+		config.NumberingMode != NumberingModeManual {
 		config.NumberingMode = defaultConfig.NumberingMode
 	}
 

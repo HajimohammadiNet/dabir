@@ -9,6 +9,8 @@ type Repository interface {
 	NextNumber(ctx context.Context) (int64, error)
 	NextNumberForYear(ctx context.Context, jalaliYear int) (int64, error)
 
+	ExistsByDisplayLetterNumber(ctx context.Context, displayNumber string) (bool, error)
+
 	Create(ctx context.Context, l *Letter) error
 	FindByID(ctx context.Context, id string) (*Letter, error)
 	List(ctx context.Context, filter ListFilter) ([]Letter, int, error)

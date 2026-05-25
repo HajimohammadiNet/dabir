@@ -53,6 +53,9 @@ export default function NewLetterPage() {
 
   const [createdLetter, setCreatedLetter] = useState<Letter | null>(null);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
+  const suggestedLetterNumber = suggestNextLetterNumber(lastLetterNumber);
+  const suggestedLetterNumberPlaceholder =
+    formatLetterNumberPlaceholder(suggestedLetterNumber);
 
   const loadPageData = useCallback(async () => {
     try {
@@ -167,19 +170,30 @@ export default function NewLetterPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="display_letter_number">
-                    {t.displayLetterNumber}
-                  </Label>
-                  <Input
-                    id="display_letter_number"
-                    value={displayLetterNumber}
-                    onChange={(event) =>
-                      setDisplayLetterNumber(event.target.value)
-                    }
-                    required
-                    dir="ltr"
-                    placeholder="405-158"
-                  />
+                    <Label htmlFor="display_letter_number">
+                        {t.displayLetterNumber}
+                    </Label>
+
+                    <Input
+                        id="display_letter_number"
+                        value={displayLetterNumber}
+                        onChange={(event) =>
+                            setDisplayLetterNumber(event.target.value)
+                        }
+                        required
+                        dir="ltr"
+                        placeholder={suggestedLetterNumberPlaceholder}
+                        className="text-left"
+                        style={{
+                            direction: "ltr",
+                            unicodeBidi: "plaintext",
+                        }}
+                    />
+
+                    <p className="text-xs text-muted-foreground">
+                        شماره پیشنهادی بعدی:{" "}
+                        <LetterNumberText value={suggestedLetterNumber} />
+                    </p>
                 </div>
               </CardContent>
             </Card>
@@ -361,4 +375,41 @@ function InfoRow({
       )}
     </div>
   );
+}
+
+function suggestNextLetterNumber(lastNumber: string | null) {
+  if (!lastNumber) {
+    return "405-158";
+  }
+
+  const value = lastNumber.trim();
+  if (!value) {
+    return "405-158";
+  }
+
+  const match = value.match(/(\d+)(?!.*\d)/);
+  if (!match || match.index === undefined) {
+    return value;
+  }
+
+  const numericPart = match[1];
+  const nextNumber = String(Number(numericPart) + 1).padStart(
+    numericPart.length,
+    "0"
+  );
+
+  return (
+    value.slice(0, match.index) +
+    nextNumber +
+    value.slice(match.index + numericPart.length)
+  );
+}
+
+function formatLetterNumberPlaceholder(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  // LRI + PDI forces the placeholder to keep mixed Persian/Latin order.
+  return `\u2066${value}\u2069`;
 }

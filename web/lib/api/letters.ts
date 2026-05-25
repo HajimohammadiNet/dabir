@@ -11,6 +11,8 @@ export type ListLettersParams = {
   from_date?: string;
   to_date?: string;
   include_deleted?: boolean;
+  sort_by?: "created_at" | "letter_date" | "letter_number";
+  sort_order?: "asc" | "desc";
 };
 
 function buildQuery(params: ListLettersParams) {

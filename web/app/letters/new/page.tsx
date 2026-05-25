@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { JalaliDatePicker } from "@/components/common/jalali-date-picker";
+import { LetterNumberText } from "@/components/common/letter-number-text";
 
 export default function NewLetterPage() {
   const router = useRouter();
@@ -60,8 +61,10 @@ export default function NewLetterPage() {
 
       if (token) {
         const lettersResult = await listLetters(token, {
-          page: 1,
-          page_size: 1,
+            page: 1,
+            page_size: 1,
+            sort_by: "created_at",
+            sort_order: "desc",
         });
 
         if (lettersResult.items.length > 0) {
@@ -155,7 +158,11 @@ export default function NewLetterPage() {
                     {t.lastLetterNumber}
                   </div>
                   <div className="mt-1 text-2xl font-bold" dir="ltr">
-                    {lastLetterNumber || "-"}
+                    {lastLetterNumber ? (
+                        <LetterNumberText value={lastLetterNumber} />
+                    ) : (
+                        "-"
+                    )}
                   </div>
                 </div>
 
@@ -277,7 +284,7 @@ export default function NewLetterPage() {
                       className="mt-2 text-4xl font-bold tracking-wide"
                       dir="ltr"
                     >
-                      {createdLetter.formatted_letter_number}
+                      <LetterNumberText value={createdLetter.formatted_letter_number} />
                     </div>
                   </div>
 

@@ -27,6 +27,9 @@ type ListLettersInput struct {
 	ToDate   string
 
 	IncludeDeleted bool
+
+	SortBy    string
+	SortOrder string
 }
 
 type ListLettersOutput struct {
@@ -65,6 +68,9 @@ func (uc *ListLettersUseCase) Execute(ctx context.Context, input ListLettersInpu
 	input.Sender = strings.TrimSpace(input.Sender)
 	input.Receiver = strings.TrimSpace(input.Receiver)
 
+	input.SortBy = normalizeSortBy(input.SortBy)
+	input.SortOrder = normalizeSortOrder(input.SortOrder)
+
 	filter := letter.ListFilter{
 		Page:           input.Page,
 		PageSize:       input.PageSize,
@@ -72,7 +78,8 @@ func (uc *ListLettersUseCase) Execute(ctx context.Context, input ListLettersInpu
 		RegistrarName:  input.RegistrarName,
 		Sender:         input.Sender,
 		Receiver:       input.Receiver,
-		IncludeDeleted: input.IncludeDeleted,
+		IncludeDeleted: input.IncludeDeleted, SortBy: input.SortBy,
+		SortOrder: input.SortOrder,
 	}
 
 	if input.FromDate != "" {
@@ -126,4 +133,26 @@ func parseDate(value string, fieldName string) (time.Time, error) {
 	}
 
 	return parsed, nil
+}
+
+func normalizeSortBy(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+
+	switch value {
+	case "created_at", "letter_date", "letter_number":
+		return value
+	default:
+		return "letter_date"
+	}
+}
+
+func normalizeSortOrder(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+
+	switch value {
+	case "asc", "desc":
+		return value
+	default:
+		return "desc"
+	}
 }

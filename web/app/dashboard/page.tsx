@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
+import { LetterNumberText } from "@/components/common/letter-number-text";
 import { useAuth } from "@/contexts/auth-context";
 import { listLetters } from "@/lib/api/letters";
 import { listUsers } from "@/lib/api/users";
@@ -38,6 +39,8 @@ export default function DashboardPage() {
       const lettersResult = await listLetters(token, {
         page: 1,
         page_size: 1,
+        sort_by: "created_at",
+        sort_order: "desc",
       });
 
       let usersTotal: number | null = null;
@@ -69,11 +72,13 @@ export default function DashboardPage() {
   }, [token, user]);
 
   useEffect(() => {
-    const load = async () => {
-      await loadStats();
-    };
+    const timeoutID = window.setTimeout(() => {
+      void loadStats();
+    }, 0);
 
-    void load();
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
   }, [loadStats]);
 
   return (
@@ -114,8 +119,14 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>{t.lastNumber}</CardTitle>
               </CardHeader>
-              <CardContent className="text-3xl font-bold" dir="ltr">
-                {loading ? "..." : stats.lastNumber ?? "-"}
+              <CardContent className="text-3xl font-bold">
+                {loading ? (
+                  "..."
+                ) : stats.lastNumber ? (
+                  <LetterNumberText value={stats.lastNumber} />
+                ) : (
+                  "-"
+                )}
               </CardContent>
             </Card>
           </div>

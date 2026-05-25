@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
@@ -273,32 +274,33 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 		return nil, 0, fmt.Errorf("failed to count letters: %w", err)
 	}
 
+	orderBy := buildLettersOrderBy(filter)
 	query := fmt.Sprintf(`
-	SELECT
-		id,
-		letter_number,
-		display_letter_number,
-		letter_year,
-		letter_year_suffix,
-		letter_serial,
-		title,
-		letter_date,
-		registrar_name,
-		sender,
-		receiver,
-		description,
-		created_by,
-		updated_by,
-		deleted_by,
-		is_deleted,
-		created_at,
-		updated_at,
-		deleted_at
-	FROM letters
-	%s
-	ORDER BY created_at DESC
-	LIMIT $%d OFFSET $%d
-`, where, argPos, argPos+1)
+		SELECT
+			id,
+			letter_number,
+			display_letter_number,
+			letter_year,
+			letter_year_suffix,
+			letter_serial,
+			title,
+			letter_date,
+			registrar_name,
+			sender,
+			receiver,
+			description,
+			created_by,
+			updated_by,
+			deleted_by,
+			is_deleted,
+			created_at,
+			updated_at,
+			deleted_at
+		FROM letters
+		%s
+		%s
+		LIMIT $%d OFFSET $%d
+	`, where, orderBy, argPos, argPos+1)
 
 	args = append(args, filter.PageSize, offset)
 
@@ -528,4 +530,51 @@ func (r *LetterRepository) FindExistingNumbers(ctx context.Context, numbers []in
 	}
 
 	return existing, nil
+}
+
+func buildLettersOrderBy(filter letter.ListFilter) string {
+	sortOrder := strings.ToUpper(strings.TrimSpace(filter.SortOrder))
+	if sortOrder != "ASC" && sortOrder != "DESC" {
+		sortOrder = "DESC"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(filter.SortBy)) {
+	case "created_at":
+		if sortOrder == "ASC" {
+			return "ORDER BY created_at ASC, letter_number ASC, id ASC"
+		}
+
+		return "ORDER BY created_at DESC, letter_number DESC, id DESC"
+
+	case "letter_date":
+		if sortOrder == "ASC" {
+			return "ORDER BY letter_date ASC, letter_number ASC, created_at ASC, id ASC"
+		}
+
+		return "ORDER BY letter_date DESC, letter_number DESC, created_at DESC, id DESC"
+
+	case "letter_number":
+		return fmt.Sprintf(`
+			ORDER BY
+				NULLIF(
+					regexp_replace(
+						translate(
+							COALESCE(display_letter_number, letter_number::text),
+							'۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',
+							'01234567890123456789'
+						),
+						'[^0-9]+',
+						'',
+						'g'
+					),
+					''
+				)::numeric %s NULLS LAST,
+				letter_number %s,
+				created_at %s,
+				id %s
+		`, sortOrder, sortOrder, sortOrder, sortOrder)
+
+	default:
+		return "ORDER BY letter_date DESC, letter_number DESC, created_at DESC, id DESC"
+	}
 }

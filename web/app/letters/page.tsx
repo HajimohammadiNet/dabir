@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
+import { LetterNumberText } from "@/components/common/letter-number-text";
 import { useAuth } from "@/contexts/auth-context";
 import { deleteLetter, listLetters } from "@/lib/api/letters";
 import { useI18n } from "@/lib/i18n/i18n-context";
@@ -38,6 +40,9 @@ import {
 
 const DEFAULT_PAGE_SIZE = 20;
 
+type SortBy = "created_at" | "letter_date" | "letter_number";
+type SortOrder = "asc" | "desc";
+
 export default function LettersPage() {
   const { token, user } = useAuth();
   const { t } = useI18n();
@@ -45,9 +50,14 @@ export default function LettersPage() {
   const [letters, setLetters] = useState<Letter[]>([]);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
+
+  const [sortBy, setSortBy] = useState<SortBy>("letter_date");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
   const [loading, setLoading] = useState(false);
 
   const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
@@ -74,6 +84,8 @@ export default function LettersPage() {
         page,
         page_size: pageSize,
         search: appliedSearch,
+        sort_by: sortBy,
+        sort_order: sortOrder,
       });
 
       setLetters(result.items);
@@ -83,7 +95,7 @@ export default function LettersPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, page, pageSize, appliedSearch]);
+  }, [token, page, pageSize, appliedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     const timeoutID = window.setTimeout(() => {
@@ -115,7 +127,7 @@ export default function LettersPage() {
     }
   }
 
-  function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(1);
     setAppliedSearch(search.trim());
@@ -178,6 +190,31 @@ export default function LettersPage() {
                 </span>
 
                 <select
+                  value={sortBy}
+                  onChange={(event) => {
+                    setPage(1);
+                    setSortBy(event.target.value as SortBy);
+                  }}
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                >
+                  <option value="created_at">زمان ثبت</option>
+                  <option value="letter_date">تاریخ نامه</option>
+                  <option value="letter_number">شماره نامه</option>
+                </select>
+
+                <select
+                  value={sortOrder}
+                  onChange={(event) => {
+                    setPage(1);
+                    setSortOrder(event.target.value as SortOrder);
+                  }}
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                >
+                  <option value="desc">نزولی</option>
+                  <option value="asc">صعودی</option>
+                </select>
+
+                <select
                   value={pageSize}
                   onChange={(event) => handlePageSizeChange(event.target.value)}
                   className="rounded-md border bg-background px-2 py-1 text-sm"
@@ -195,11 +232,11 @@ export default function LettersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[130px] whitespace-nowrap">
+                      <TableHead className="w-[140px] whitespace-nowrap">
                         {t.number}
                       </TableHead>
                       <TableHead>{t.letterTitle}</TableHead>
-                      <TableHead className="w-[120px] whitespace-nowrap">
+                      <TableHead className="w-[130px] whitespace-nowrap">
                         {t.letterDate}
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
@@ -237,14 +274,13 @@ export default function LettersPage() {
                           className="cursor-pointer"
                           onClick={() => setSelectedLetter(letter)}
                         >
-                          <TableCell
-                            className="whitespace-nowrap font-medium"
-                            dir="ltr"
-                          >
-                            {letter.formatted_letter_number}
+                          <TableCell className="whitespace-nowrap font-medium">
+                            <LetterNumberText
+                              value={letter.formatted_letter_number}
+                            />
                           </TableCell>
 
-                          <TableCell className="max-w-[420px]">
+                          <TableCell className="max-w-[480px]">
                             <div className="line-clamp-2 font-medium">
                               {letter.title}
                             </div>
@@ -387,7 +423,11 @@ function LetterPreviewDialog({
         <DialogHeader>
           <DialogTitle>{t.letterDetails}</DialogTitle>
           <DialogDescription>
-            {letter?.formatted_letter_number || ""}
+            {letter ? (
+              <LetterNumberText value={letter.formatted_letter_number} />
+            ) : (
+              ""
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -395,9 +435,11 @@ function LetterPreviewDialog({
           <div className="space-y-6">
             <div className="rounded-xl border bg-muted/30 p-6 text-center">
               <div className="text-sm text-muted-foreground">{t.number}</div>
-              <div className="mt-2 text-4xl font-bold tracking-wide" dir="ltr">
-                {letter.formatted_letter_number}
-              </div>
+
+              <LetterNumberText
+                value={letter.formatted_letter_number}
+                className="mt-2 block text-4xl font-bold tracking-wide"
+              />
             </div>
 
             <div className="grid gap-3 text-sm">
@@ -475,9 +517,12 @@ function DeleteLetterDialog({
           <div className="space-y-4">
             <div className="rounded-lg border bg-muted/30 p-4">
               <div className="text-sm text-muted-foreground">{t.number}</div>
-              <div className="mt-1 font-bold" dir="ltr">
-                {letter.formatted_letter_number}
-              </div>
+
+              <LetterNumberText
+                value={letter.formatted_letter_number}
+                className="mt-1 font-bold"
+              />
+
               <div className="mt-2 text-sm">{letter.title}</div>
             </div>
 

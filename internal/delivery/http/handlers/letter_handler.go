@@ -107,6 +107,8 @@ func (h *LetterHandler) List(w http.ResponseWriter, r *http.Request) {
 		FromDate:       query.Get("from_date"),
 		ToDate:         query.Get("to_date"),
 		IncludeDeleted: includeDeleted,
+		SortBy:         query.Get("sort_by"),
+		SortOrder:      query.Get("sort_order"),
 	})
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "LIST_LETTERS_FAILED", err.Error())

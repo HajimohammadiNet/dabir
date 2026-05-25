@@ -35,4 +35,7 @@ type ListFilter struct {
 	ToDate   *time.Time
 
 	IncludeDeleted bool
+
+	SortBy    string
+	SortOrder string
 }

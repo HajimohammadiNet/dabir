@@ -7,7 +7,13 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { useAuth } from "@/contexts/auth-context";
-import { createLetter, listLetters } from "@/lib/api/letters";
+import {
+  createLetter,
+  getLetterNumberSuggestion,
+  listLetters,
+  type LetterNumberSuggestion,
+} from "@/lib/api/letters";
+
 import { getPublicSettings } from "@/lib/api/settings";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import type { Letter } from "@/types/letter";
@@ -42,6 +48,9 @@ export default function NewLetterPage() {
   const [numberingMode, setNumberingMode] =
     useState<NumberingMode>("fixed_prefix");
   const [lastLetterNumber, setLastLetterNumber] = useState<string | null>(null);
+  const [patternSuggestion, setPatternSuggestion] =
+  useState<LetterNumberSuggestion | null>(null);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
 
   const [displayLetterNumber, setDisplayLetterNumber] = useState("");
   const [title, setTitle] = useState("");
@@ -53,7 +62,13 @@ export default function NewLetterPage() {
 
   const [createdLetter, setCreatedLetter] = useState<Letter | null>(null);
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
-  const suggestedLetterNumber = suggestNextLetterNumber(lastLetterNumber);
+  const suggestedLetterNumber =
+    patternSuggestion?.suggested_number ||
+    suggestNextLetterNumber(lastLetterNumber);
+
+  const effectiveLastNumber =
+    patternSuggestion?.last_number || lastLetterNumber;
+
   const suggestedLetterNumberPlaceholder =
     formatLetterNumberPlaceholder(suggestedLetterNumber);
 
@@ -92,6 +107,33 @@ export default function NewLetterPage() {
       window.clearTimeout(timeoutID);
     };
   }, [loadPageData]);
+
+    useEffect(() => {
+    const timeoutID = window.setTimeout(async () => {
+        if (!token || numberingMode !== "manual") {
+        setPatternSuggestion(null);
+        setSuggestionLoading(false);
+        return;
+        }
+
+        const prefix = extractSuggestionPrefix(displayLetterNumber);
+
+        setSuggestionLoading(true);
+
+        try {
+        const result = await getLetterNumberSuggestion(token, prefix);
+        setPatternSuggestion(result);
+        } catch {
+        setPatternSuggestion(null);
+        } finally {
+        setSuggestionLoading(false);
+        }
+    }, 400);
+
+    return () => {
+        window.clearTimeout(timeoutID);
+    };
+    }, [token, numberingMode, displayLetterNumber]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,10 +232,50 @@ export default function NewLetterPage() {
                         }}
                     />
 
-                    <p className="text-xs text-muted-foreground">
-                        شماره پیشنهادی بعدی:{" "}
-                        <LetterNumberText value={suggestedLetterNumber} />
-                    </p>
+                    <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span>
+                            {displayLetterNumber.trim()
+                                ? "آخرین شماره مشابه:"
+                                : "آخرین شماره کلی:"}
+                            </span>
+
+                            <span className="font-medium">
+                            {suggestionLoading ? (
+                                "..."
+                            ) : effectiveLastNumber ? (
+                                <LetterNumberText value={effectiveLastNumber} />
+                            ) : (
+                                "-"
+                            )}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span>شماره پیشنهادی بعدی:</span>
+
+                            <span className="font-medium">
+                            {suggestionLoading ? (
+                                "..."
+                            ) : suggestedLetterNumber ? (
+                                <LetterNumberText value={suggestedLetterNumber} />
+                            ) : (
+                                "-"
+                            )}
+                            </span>
+                        </div>
+
+                        {suggestedLetterNumber ? (
+                            <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDisplayLetterNumber(suggestedLetterNumber)}
+                            >
+                            استفاده از پیشنهاد
+                            </Button>
+                        ) : null}
+                        </div>
                 </div>
               </CardContent>
             </Card>
@@ -377,6 +459,28 @@ function InfoRow({
   );
 }
 
+function extractSuggestionPrefix(value: string) {
+  const trimmed = normalizeDigitsForSuggestion(value.trim());
+
+  if (!trimmed) {
+    return "";
+  }
+
+  // اگر کاربر خودش prefix وارد کرده باشد، مثل:
+  // 405-ق-
+  // ۴۰۵-ق-
+  // HR-2026-
+  if (/[-_/\\.\s]$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // اگر آخر ورودی عدد دارد، عدد انتهایی را حذف کن:
+  // 405-ق-001 -> 405-ق-
+  // ۴۰۵-ق-۰۰۱ -> 405-ق-
+  // HR-2026-0042 -> HR-2026-
+  return trimmed.replace(/[0-9]+$/, "");
+}
+
 function suggestNextLetterNumber(lastNumber: string | null) {
   if (!lastNumber) {
     return "405-158";
@@ -412,4 +516,10 @@ function formatLetterNumberPlaceholder(value: string) {
 
   // LRI + PDI forces the placeholder to keep mixed Persian/Latin order.
   return `\u2066${value}\u2069`;
+}
+
+function normalizeDigitsForSuggestion(value: string) {
+  return value
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
 }

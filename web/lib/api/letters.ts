@@ -15,7 +15,7 @@ export type ListLettersParams = {
   sort_order?: "asc" | "desc";
 };
 
-function buildQuery(params: ListLettersParams) {
+function buildQuery(params: Record<string, unknown>) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -53,4 +53,19 @@ export async function createLetter(token: string, input: CreateLetterInput) {
 
 export async function deleteLetter(token: string, id: string) {
   return apiClient.delete<{ deleted: boolean }>(`/letters/${id}`, token);
+}
+
+export type LetterNumberSuggestion = {
+  prefix: string;
+  last_number?: string | null;
+  suggested_number?: string | null;
+};
+
+export async function getLetterNumberSuggestion(token: string, prefix: string) {
+  const query = buildQuery({ prefix });
+
+  return apiClient.get<LetterNumberSuggestion>(
+    `/letters/number-suggestion${query}`,
+    token
+  );
 }

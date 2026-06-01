@@ -76,6 +76,50 @@ func (r *LetterRepository) ExistsByDisplayLetterNumber(ctx context.Context, disp
 	return exists, nil
 }
 
+func (r *LetterRepository) FindLatestDisplayLetterNumberByPrefix(ctx context.Context, prefix string) (*string, error) {
+	prefix = strings.TrimSpace(prefix)
+
+	const query = `
+		SELECT display_letter_number
+		FROM letters
+		WHERE is_deleted = false
+		  AND display_letter_number IS NOT NULL
+		  AND display_letter_number <> ''
+		  AND (
+		    $1 = ''
+		    OR display_letter_number ILIKE $2 ESCAPE '\'
+		  )
+		ORDER BY letter_number DESC, created_at DESC, id DESC
+		LIMIT 1
+	`
+
+	var value string
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		prefix,
+		escapeLikePattern(prefix)+"%",
+	).Scan(&value)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("failed to find latest display letter number by prefix: %w", err)
+	}
+
+	return &value, nil
+}
+
+func escapeLikePattern(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `%`, `\%`)
+	value = strings.ReplaceAll(value, `_`, `\_`)
+
+	return value
+}
+
 func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 	const query = `
 		INSERT INTO letters (

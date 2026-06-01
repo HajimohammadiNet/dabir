@@ -17,12 +17,13 @@ import (
 )
 
 type LetterHandler struct {
-	createLetterUseCase *lettersapp.CreateLetterUseCase
-	listLettersUseCase  *lettersapp.ListLettersUseCase
-	getLetterUseCase    *lettersapp.GetLetterUseCase
-	updateLetterUseCase *lettersapp.UpdateLetterUseCase
-	deleteLetterUseCase *lettersapp.DeleteLetterUseCase
-	auditLogger         *auditapp.Logger
+	createLetterUseCase        *lettersapp.CreateLetterUseCase
+	listLettersUseCase         *lettersapp.ListLettersUseCase
+	getLetterUseCase           *lettersapp.GetLetterUseCase
+	updateLetterUseCase        *lettersapp.UpdateLetterUseCase
+	deleteLetterUseCase        *lettersapp.DeleteLetterUseCase
+	suggestLetterNumberUseCase *lettersapp.SuggestLetterNumberUseCase
+	auditLogger                *auditapp.Logger
 }
 
 func NewLetterHandler(
@@ -31,15 +32,17 @@ func NewLetterHandler(
 	getLetterUseCase *lettersapp.GetLetterUseCase,
 	updateLetterUseCase *lettersapp.UpdateLetterUseCase,
 	deleteLetterUseCase *lettersapp.DeleteLetterUseCase,
+	suggestLetterNumberUseCase *lettersapp.SuggestLetterNumberUseCase,
 	auditLogger *auditapp.Logger,
 ) *LetterHandler {
 	return &LetterHandler{
-		createLetterUseCase: createLetterUseCase,
-		listLettersUseCase:  listLettersUseCase,
-		getLetterUseCase:    getLetterUseCase,
-		updateLetterUseCase: updateLetterUseCase,
-		deleteLetterUseCase: deleteLetterUseCase,
-		auditLogger:         auditLogger,
+		createLetterUseCase:        createLetterUseCase,
+		listLettersUseCase:         listLettersUseCase,
+		getLetterUseCase:           getLetterUseCase,
+		updateLetterUseCase:        updateLetterUseCase,
+		deleteLetterUseCase:        deleteLetterUseCase,
+		suggestLetterNumberUseCase: suggestLetterNumberUseCase,
+		auditLogger:                auditLogger,
 	}
 }
 
@@ -112,6 +115,20 @@ func (h *LetterHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "LIST_LETTERS_FAILED", err.Error())
+		return
+	}
+
+	response.JSON(w, http.StatusOK, output)
+}
+
+func (h *LetterHandler) SuggestNumber(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	output, err := h.suggestLetterNumberUseCase.Execute(r.Context(), lettersapp.SuggestLetterNumberInput{
+		Prefix: query.Get("prefix"),
+	})
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "SUGGEST_LETTER_NUMBER_FAILED", err.Error())
 		return
 	}
 

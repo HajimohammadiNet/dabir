@@ -126,6 +126,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 	getLetterUseCase := lettersapp.NewGetLetterUseCase(letterRepo, letterConfigProvider)
 	updateLetterUseCase := lettersapp.NewUpdateLetterUseCase(letterRepo, letterConfigProvider)
 	deleteLetterUseCase := lettersapp.NewDeleteLetterUseCase(letterRepo)
+	suggestLetterNumberUseCase := lettersapp.NewSuggestLetterNumberUseCase(letterRepo)
 
 	letterHandler := handlers.NewLetterHandler(
 		createLetterUseCase,
@@ -133,6 +134,7 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 		getLetterUseCase,
 		updateLetterUseCase,
 		deleteLetterUseCase,
+		suggestLetterNumberUseCase,
 		auditLogger,
 	)
 
@@ -189,6 +191,9 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 
 			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
 				Get("/", letterHandler.List)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
+				Get("/number-suggestion", letterHandler.SuggestNumber)
 
 			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
 				Get("/{id}", letterHandler.GetByID)

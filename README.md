@@ -1,3 +1,4 @@
+![CI](https://github.com/hajimohammadinet/dabir/actions/workflows/ci.yml/badge.svg)
 # Dabir
 
 **Dabir** is an open-source letter numbering and registry system built for organizations that need a simple, auditable, and structured replacement for spreadsheet-based letter tracking.

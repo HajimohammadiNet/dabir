@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/table";
 
 import {
-  deleteLetterAttachment,
   getAttachmentDownloadURL,
   listLetterAttachments,
 } from "@/lib/api/attachments";
@@ -431,42 +430,40 @@ function LetterPreviewDialog({
   onDelete: (letter: Letter) => void;
 }) {
   const { t } = useI18n();
-  const { token, user } = useAuth();
+  const { token } = useAuth();
 
   const [attachments, setAttachments] = useState<LetterAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
-  const [deletingAttachmentID, setDeletingAttachmentID] = useState<string | null>(
-    null
-  );
 
-  const canManageAttachments =
-    user?.role === "superuser" || user?.role === "editor";
+  const loadAttachments = useCallback(async () => {
+    if (!token || !letter) {
+      setAttachments([]);
+      return;
+    }
+
+    setAttachmentsLoading(true);
+
+    try {
+      const result = await listLetterAttachments(token, letter.id);
+      setAttachments(result);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load attachments"
+      );
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  }, [token, letter]);
 
   useEffect(() => {
-    const timeoutID = window.setTimeout(async () => {
-      if (!token || !letter) {
-        setAttachments([]);
-        return;
-      }
-
-      setAttachmentsLoading(true);
-
-      try {
-        const result = await listLetterAttachments(token, letter.id);
-        setAttachments(result);
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Failed to load attachments"
-        );
-      } finally {
-        setAttachmentsLoading(false);
-      }
+    const timeoutID = window.setTimeout(() => {
+      void loadAttachments();
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutID);
     };
-  }, [token, letter]);
+  }, [loadAttachments]);
 
   async function handleOpenAttachment(attachment: LetterAttachment) {
     if (!token || !letter) return;
@@ -486,31 +483,9 @@ function LetterPreviewDialog({
     }
   }
 
-  async function handleDeleteAttachment(attachment: LetterAttachment) {
-    if (!token || !letter) return;
-
-    setDeletingAttachmentID(attachment.id);
-
-    try {
-      await deleteLetterAttachment(token, letter.id, attachment.id);
-
-      setAttachments((current) =>
-        current.filter((item) => item.id !== attachment.id)
-      );
-
-      toast.success("فایل پیوست حذف شد");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to delete attachment"
-      );
-    } finally {
-      setDeletingAttachmentID(null);
-    }
-  }
-
   return (
     <Dialog open={Boolean(letter)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t.letterDetails}</DialogTitle>
           <DialogDescription>
@@ -523,7 +498,7 @@ function LetterPreviewDialog({
         </DialogHeader>
 
         {letter ? (
-          <div className="space-y-6">
+          <div className="max-h-[calc(90vh-7rem)] space-y-6 overflow-y-auto pr-1">
             <div className="rounded-xl border bg-muted/30 p-6 text-center">
               <div className="text-sm text-muted-foreground">{t.number}</div>
 
@@ -557,35 +532,30 @@ function LetterPreviewDialog({
               />
             </div>
 
-            <div className="space-y-3">
-              <div className="font-semibold">اسکن نامه / پیوست‌ها</div>
-
+            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
               {attachmentsLoading ? (
-                <div className="text-sm text-muted-foreground">
-                  {t.commonLoading}
-                </div>
+                <div className="text-sm text-muted-foreground">{t.commonLoading}</div>
               ) : attachments.length === 0 ? (
-                <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                <div className="rounded-md border bg-background/60 p-3 text-sm text-muted-foreground">
                   فایلی برای این نامه ثبت نشده است.
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
                   {attachments.map((attachment) => (
                     <div
                       key={attachment.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/60 p-3 text-sm"
                     >
                       <div className="min-w-0">
-                        <div className="font-medium">
+                        <div className="truncate font-medium">
                           {attachment.file_name}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {attachment.content_type} -{" "}
-                          {formatFileSize(attachment.size_bytes)}
+                          {attachment.content_type} - {formatFileSize(attachment.size_bytes)}
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex shrink-0 gap-2">
                         <Button
                           type="button"
                           variant="outline"
@@ -594,22 +564,6 @@ function LetterPreviewDialog({
                         >
                           مشاهده
                         </Button>
-
-                        {canManageAttachments ? (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            disabled={deletingAttachmentID === attachment.id}
-                            onClick={() =>
-                              void handleDeleteAttachment(attachment)
-                            }
-                          >
-                            {deletingAttachmentID === attachment.id
-                              ? t.commonLoading
-                              : t.commonDelete}
-                          </Button>
-                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -648,7 +602,6 @@ function LetterPreviewDialog({
     </Dialog>
   );
 }
-
 function DeleteLetterDialog({
   letter,
   loading,
@@ -716,6 +669,7 @@ function formatFileSize(sizeBytes: number) {
 
   return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
 
 function InfoRow({
   label,

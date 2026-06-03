@@ -39,6 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { JalaliDatePicker } from "@/components/common/jalali-date-picker";
 import { LetterNumberText } from "@/components/common/letter-number-text";
+import { uploadLetterAttachments } from "@/lib/api/attachments";
 
 export default function NewLetterPage() {
   const router = useRouter();
@@ -71,6 +72,9 @@ export default function NewLetterPage() {
 
   const suggestedLetterNumberPlaceholder =
     formatLetterNumberPlaceholder(suggestedLetterNumber);
+
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
 
   const loadPageData = useCallback(async () => {
     try {
@@ -158,6 +162,24 @@ export default function NewLetterPage() {
         description: description || null,
       });
 
+      if (selectedFiles.length > 0) {
+        setUploadingAttachments(true);
+
+        try {
+          await uploadLetterAttachments(token, letter.id, selectedFiles);
+          toast.success("فایل‌های پیوست با موفقیت آپلود شدند");
+          setSelectedFiles([]);
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "نامه ثبت شد اما آپلود فایل‌ها ناموفق بود"
+          );
+        } finally {
+          setUploadingAttachments(false);
+        }
+      }
+
       setCreatedLetter(letter);
       setResultDialogOpen(true);
       setLastLetterNumber(letter.formatted_letter_number);
@@ -177,6 +199,7 @@ export default function NewLetterPage() {
     setSender("");
     setReceiver("");
     setDescription("");
+    setSelectedFiles([]);
     setCreatedLetter(null);
     setResultDialogOpen(false);
   }
@@ -339,9 +362,41 @@ export default function NewLetterPage() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="attachments">اسکن نامه / پیوست‌ها</Label>
+
+                  <Input
+                    id="attachments"
+                    type="file"
+                    multiple
+                    accept=".pdf,image/jpeg,image/png"
+                    onChange={(event) => {
+                      setSelectedFiles(Array.from(event.target.files || []));
+                    }}
+                  />
+
+                  <p className="text-xs text-muted-foreground">
+                    آپلود فایل اختیاری است. فرمت‌های مجاز: PDF, JPG, PNG
+                  </p>
+
+                  {selectedFiles.length > 0 ? (
+                    <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                      <div className="mb-2 font-medium">فایل‌های انتخاب‌شده:</div>
+
+                      <ul className="space-y-1 text-muted-foreground">
+                        {selectedFiles.map((file) => (
+                          <li key={`${file.name}-${file.size}`}>
+                            {file.name} - {formatFileSize(file.size)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+
                 <div className="flex gap-2">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? t.creatingLetter : t.createLetter}
+                  <Button type="submit" disabled={loading || uploadingAttachments}>
+                    {loading || uploadingAttachments ? t.commonLoading : t.createLetter}
                   </Button>
 
                   <Button
@@ -522,4 +577,16 @@ function normalizeDigitsForSuggestion(value: string) {
   return value
     .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
     .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)));
+}
+
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
 }

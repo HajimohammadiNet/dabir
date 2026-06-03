@@ -38,6 +38,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import {
+  deleteLetterAttachment,
+  getAttachmentDownloadURL,
+  listLetterAttachments,
+} from "@/lib/api/attachments";
+import type { LetterAttachment } from "@/types/attachment";
+
 const DEFAULT_PAGE_SIZE = 20;
 
 type SortBy = "created_at" | "letter_date" | "letter_number";
@@ -424,6 +431,82 @@ function LetterPreviewDialog({
   onDelete: (letter: Letter) => void;
 }) {
   const { t } = useI18n();
+  const { token, user } = useAuth();
+
+  const [attachments, setAttachments] = useState<LetterAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [deletingAttachmentID, setDeletingAttachmentID] = useState<string | null>(
+    null
+  );
+
+  const canManageAttachments =
+    user?.role === "superuser" || user?.role === "editor";
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(async () => {
+      if (!token || !letter) {
+        setAttachments([]);
+        return;
+      }
+
+      setAttachmentsLoading(true);
+
+      try {
+        const result = await listLetterAttachments(token, letter.id);
+        setAttachments(result);
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to load attachments"
+        );
+      } finally {
+        setAttachmentsLoading(false);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [token, letter]);
+
+  async function handleOpenAttachment(attachment: LetterAttachment) {
+    if (!token || !letter) return;
+
+    try {
+      const result = await getAttachmentDownloadURL(
+        token,
+        letter.id,
+        attachment.id
+      );
+
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to open attachment"
+      );
+    }
+  }
+
+  async function handleDeleteAttachment(attachment: LetterAttachment) {
+    if (!token || !letter) return;
+
+    setDeletingAttachmentID(attachment.id);
+
+    try {
+      await deleteLetterAttachment(token, letter.id, attachment.id);
+
+      setAttachments((current) =>
+        current.filter((item) => item.id !== attachment.id)
+      );
+
+      toast.success("فایل پیوست حذف شد");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete attachment"
+      );
+    } finally {
+      setDeletingAttachmentID(null);
+    }
+  }
 
   return (
     <Dialog open={Boolean(letter)} onOpenChange={(open) => !open && onClose()}>
@@ -472,6 +555,66 @@ function LetterPreviewDialog({
                 value={new Date(letter.created_at).toLocaleString()}
                 forceLtr
               />
+            </div>
+
+            <div className="space-y-3">
+              <div className="font-semibold">اسکن نامه / پیوست‌ها</div>
+
+              {attachmentsLoading ? (
+                <div className="text-sm text-muted-foreground">
+                  {t.commonLoading}
+                </div>
+              ) : attachments.length === 0 ? (
+                <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  فایلی برای این نامه ثبت نشده است.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium">
+                          {attachment.file_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {attachment.content_type} -{" "}
+                          {formatFileSize(attachment.size_bytes)}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleOpenAttachment(attachment)}
+                        >
+                          مشاهده
+                        </Button>
+
+                        {canManageAttachments ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={deletingAttachmentID === attachment.id}
+                            onClick={() =>
+                              void handleDeleteAttachment(attachment)
+                            }
+                          >
+                            {deletingAttachmentID === attachment.id
+                              ? t.commonLoading
+                              : t.commonDelete}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -560,6 +703,18 @@ function DeleteLetterDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function InfoRow({

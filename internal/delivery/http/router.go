@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	attachmentsapp "github.com/hajimohammadinet/dabir/internal/application/attachments"
 	auditapp "github.com/hajimohammadinet/dabir/internal/application/audit"
 	authapp "github.com/hajimohammadinet/dabir/internal/application/auth"
 	importsapp "github.com/hajimohammadinet/dabir/internal/application/imports"
@@ -21,6 +22,7 @@ import (
 	infraauth "github.com/hajimohammadinet/dabir/internal/infrastructure/auth"
 	"github.com/hajimohammadinet/dabir/internal/infrastructure/postgres"
 	"github.com/hajimohammadinet/dabir/internal/infrastructure/security"
+	storageinfra "github.com/hajimohammadinet/dabir/internal/infrastructure/storage"
 )
 
 func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.Handler {
@@ -97,6 +99,43 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 	)
 
 	letterRepo := postgres.NewLetterRepository(db)
+
+	attachmentRepo := postgres.NewAttachmentRepository(db)
+
+	storageClient, err := storageinfra.NewMinIOClient(cfg.Storage)
+	if err != nil {
+		panic(err)
+	}
+
+	uploadAttachmentUseCase := attachmentsapp.NewUploadAttachmentUseCase(
+		letterRepo,
+		attachmentRepo,
+		storageClient,
+		cfg.Storage,
+	)
+
+	listAttachmentsUseCase := attachmentsapp.NewListAttachmentsUseCase(
+		letterRepo,
+		attachmentRepo,
+	)
+
+	getAttachmentDownloadURLUseCase := attachmentsapp.NewGetAttachmentDownloadURLUseCase(
+		attachmentRepo,
+		storageClient,
+		cfg.Storage,
+	)
+
+	deleteAttachmentUseCase := attachmentsapp.NewDeleteAttachmentUseCase(
+		attachmentRepo,
+		storageClient,
+	)
+
+	attachmentHandler := handlers.NewAttachmentHandler(
+		uploadAttachmentUseCase,
+		listAttachmentsUseCase,
+		getAttachmentDownloadURLUseCase,
+		deleteAttachmentUseCase,
+	)
 
 	importRepo := postgres.NewImportJobRepository(db)
 	letterExcelParser := importsapp.NewLetterExcelParser()
@@ -194,6 +233,18 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 
 			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
 				Get("/number-suggestion", letterHandler.SuggestNumber)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
+				Post("/{id}/attachments", attachmentHandler.Upload)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
+				Get("/{id}/attachments", attachmentHandler.List)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
+				Get("/{id}/attachments/{attachment_id}/download-url", attachmentHandler.DownloadURL)
+
+			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor)).
+				Delete("/{id}/attachments/{attachment_id}", attachmentHandler.Delete)
 
 			r.With(httpmiddleware.RequireRoles(user.RoleSuperUser, user.RoleEditor, user.RoleReadonly)).
 				Get("/{id}", letterHandler.GetByID)

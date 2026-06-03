@@ -38,6 +38,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import {
+  getAttachmentDownloadURL,
+  listLetterAttachments,
+} from "@/lib/api/attachments";
+import type { LetterAttachment } from "@/types/attachment";
+
 const DEFAULT_PAGE_SIZE = 20;
 
 type SortBy = "created_at" | "letter_date" | "letter_number";
@@ -424,10 +430,62 @@ function LetterPreviewDialog({
   onDelete: (letter: Letter) => void;
 }) {
   const { t } = useI18n();
+  const { token } = useAuth();
+
+  const [attachments, setAttachments] = useState<LetterAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+
+  const loadAttachments = useCallback(async () => {
+    if (!token || !letter) {
+      setAttachments([]);
+      return;
+    }
+
+    setAttachmentsLoading(true);
+
+    try {
+      const result = await listLetterAttachments(token, letter.id);
+      setAttachments(result);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load attachments"
+      );
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  }, [token, letter]);
+
+  useEffect(() => {
+    const timeoutID = window.setTimeout(() => {
+      void loadAttachments();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutID);
+    };
+  }, [loadAttachments]);
+
+  async function handleOpenAttachment(attachment: LetterAttachment) {
+    if (!token || !letter) return;
+
+    try {
+      const result = await getAttachmentDownloadURL(
+        token,
+        letter.id,
+        attachment.id
+      );
+
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to open attachment"
+      );
+    }
+  }
 
   return (
     <Dialog open={Boolean(letter)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t.letterDetails}</DialogTitle>
           <DialogDescription>
@@ -440,7 +498,7 @@ function LetterPreviewDialog({
         </DialogHeader>
 
         {letter ? (
-          <div className="space-y-6">
+          <div className="max-h-[calc(90vh-7rem)] space-y-6 overflow-y-auto pr-1">
             <div className="rounded-xl border bg-muted/30 p-6 text-center">
               <div className="text-sm text-muted-foreground">{t.number}</div>
 
@@ -474,6 +532,45 @@ function LetterPreviewDialog({
               />
             </div>
 
+            <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
+              {attachmentsLoading ? (
+                <div className="text-sm text-muted-foreground">{t.commonLoading}</div>
+              ) : attachments.length === 0 ? (
+                <div className="rounded-md border bg-background/60 p-3 text-sm text-muted-foreground">
+                  فایلی برای این نامه ثبت نشده است.
+                </div>
+              ) : (
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {attachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background/60 p-3 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">
+                          {attachment.file_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {attachment.content_type} - {formatFileSize(attachment.size_bytes)}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleOpenAttachment(attachment)}
+                        >
+                          مشاهده
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={onClose}>
                 {t.commonCancel}
@@ -505,7 +602,6 @@ function LetterPreviewDialog({
     </Dialog>
   );
 }
-
 function DeleteLetterDialog({
   letter,
   loading,
@@ -561,6 +657,19 @@ function DeleteLetterDialog({
     </Dialog>
   );
 }
+
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 
 function InfoRow({
   label,

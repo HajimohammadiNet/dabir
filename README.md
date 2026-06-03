@@ -1,16 +1,23 @@
 ![CI](https://github.com/hajimohammadinet/dabir/actions/workflows/ci.yml/badge.svg)
+
 # Dabir
 
-**Dabir** is an open-source letter numbering and registry system built for organizations that need a simple, auditable, and structured replacement for spreadsheet-based letter tracking.
+**Dabir** is an open-source letter numbering and registry system for organizations that need a simple, auditable, and structured replacement for spreadsheet-based letter tracking.
 
-It provides a clean backend API, a web-based admin panel, role-based access control, Excel migration support, Jalali date support, and Kubernetes-ready deployment manifests.
+It provides a clean backend API, a web-based admin panel, role-based access control, Jalali date support, Excel migration, manual numbering, scanned letter attachments, S3-compatible object storage integration, and Kubernetes-ready deployment manifests.
 
 ---
 
 ## Features
 
 - Letter numbering and registry management
-- Automatic incremental letter numbers
+- Create, edit, preview, soft-delete, and search letters
+- Multiple numbering modes:
+  - Fixed prefix numbering, such as `DABIR-000001`
+  - Jalali yearly numbering, such as `405-0001`
+  - Manual numbering, such as `405-158`, `405-ق-103`, or any custom structure
+- Smart manual number suggestion based on the entered prefix
+- Support for Persian and Arabic digits in date and number inputs
 - Jalali / Persian calendar support
 - Persian and English UI foundation
 - RTL-friendly user interface
@@ -19,13 +26,19 @@ It provides a clean backend API, a web-based admin panel, role-based access cont
 - Password change and password reset
 - Excel import for migrating existing letters
 - Import preview and duplicate detection
+- Preserving original imported letter numbers
 - Audit logs for important system actions
 - Setup wizard for first-time initialization
+- Optional scanned letter / attachment upload
+- S3-compatible object storage support for attachments
+- Private attachment storage with presigned download/view URLs
+- Attachment management: upload, view/download, and delete
 - Dark mode support
 - REST API with OpenAPI documentation
 - Docker Compose deployment
 - Kubernetes deployment with Helm
 - External PostgreSQL support
+- GitHub Actions CI
 
 ---
 
@@ -35,9 +48,9 @@ Dabir currently supports three access levels:
 
 | Role | Description |
 |---|---|
-| `superuser` | Full system access, user management, imports, audit logs, settings |
-| `editor` | Can create, edit, delete, and view letters |
-| `readonly` | Can only view letters |
+| `superuser` | Full system access, user management, imports, audit logs, settings, and attachment management |
+| `editor` | Can create, edit, delete, and view letters; can manage attachments |
+| `readonly` | Can view letters and attachments |
 
 ---
 
@@ -51,6 +64,7 @@ Dabir currently supports three access levels:
 - JWT authentication
 - Clean architecture style
 - Database migrations
+- S3-compatible object storage client
 
 ### Frontend
 
@@ -68,6 +82,7 @@ Dabir currently supports three access levels:
 - Helm Chart
 - Kubernetes
 - External PostgreSQL
+- S3-compatible object storage, such as MinIO
 
 ---
 
@@ -109,6 +124,16 @@ Edit important values:
 ```env
 DB_PASSWORD=change-this-db-password
 JWT_SECRET=change-this-secret-in-production
+
+S3_ENDPOINT=http://localhost:9000
+S3_REGION=us-east-1
+S3_BUCKET=dabir-attachments
+S3_ACCESS_KEY=dabir
+S3_SECRET_KEY=dabir_minio_secret
+S3_USE_SSL=false
+S3_FORCE_PATH_STYLE=true
+S3_PRESIGNED_URL_TTL_MINUTES=15
+S3_MAX_UPLOAD_SIZE_MB=20
 ```
 
 Start services:
@@ -135,7 +160,7 @@ On the first run, Dabir redirects to the setup page where you can create the fir
 
 ## Local Development
 
-Start PostgreSQL:
+Start PostgreSQL and MinIO:
 
 ```bash
 make compose-up
@@ -168,6 +193,140 @@ Backend URL:
 http://localhost:8080
 ```
 
+MinIO Console URL:
+
+```text
+http://localhost:9001
+```
+
+Default local MinIO credentials, unless changed in `.env`:
+
+```text
+username: dabir
+password: dabir_minio_secret
+```
+
+---
+
+## Numbering Modes
+
+Dabir supports multiple numbering modes to fit different organizational workflows.
+
+### Fixed Prefix
+
+Example:
+
+```text
+DABIR-000001
+DABIR-000002
+```
+
+### Jalali Yearly
+
+Example:
+
+```text
+405-0001
+405-0002
+406-0001
+```
+
+### Manual Numbering
+
+Manual numbering stores the letter number exactly as entered by the user.
+
+Examples:
+
+```text
+405-158
+405-ق-103
+1401-MM-DM-95
+HR-2026-0042
+```
+
+Manual numbering also includes smart suggestions. When a user starts typing a prefix, Dabir searches for the latest similar number and suggests the next one.
+
+Examples:
+
+```text
+Input prefix: 405-
+Latest similar number: 405-158
+Suggested number: 405-159
+```
+
+```text
+Input prefix: 405-ق-
+Latest similar number: 405-ق-102
+Suggested number: 405-ق-103
+```
+
+Persian and Arabic digits are normalized for suggestion lookup, so inputs such as `۴۰۵-ق-` are also supported.
+
+---
+
+## Letter Attachments / Scanned Letters
+
+Dabir supports optional scanned letter attachments.
+
+Supported file types:
+
+```text
+PDF
+JPG / JPEG
+PNG
+```
+
+Attachment flow:
+
+```text
+Create or edit a letter
+Upload one or more optional files
+Store files in S3-compatible object storage
+Store only metadata in PostgreSQL
+View/download files through short-lived presigned URLs
+Delete attachments when needed
+```
+
+Attachments are stored privately in object storage. Dabir does not make the bucket public. The backend generates presigned URLs for viewing or downloading files.
+
+---
+
+## Object Storage / S3 Configuration
+
+Dabir uses S3-compatible object storage for attachments. MinIO is recommended for local development and small to medium on-prem deployments.
+
+Required environment variables:
+
+```env
+S3_ENDPOINT=http://minio:9000
+S3_REGION=us-east-1
+S3_BUCKET=dabir-attachments
+S3_ACCESS_KEY=dabir
+S3_SECRET_KEY=dabir_minio_secret
+S3_USE_SSL=false
+S3_FORCE_PATH_STYLE=true
+S3_PRESIGNED_URL_TTL_MINUTES=15
+S3_MAX_UPLOAD_SIZE_MB=20
+```
+
+For production, use a private bucket and a dedicated access key with limited permissions to only the required bucket.
+
+Recommended production notes:
+
+```text
+- Keep the bucket private
+- Use TLS for the S3 endpoint
+- Use a dedicated access key for Dabir
+- Configure object storage backup or replication
+- Keep S3_MAX_UPLOAD_SIZE_MB aligned with the ingress upload limit
+```
+
+For NGINX Ingress, make sure the upload size is higher than `S3_MAX_UPLOAD_SIZE_MB`:
+
+```yaml
+nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+```
+
 ---
 
 ## Kubernetes Deployment
@@ -181,6 +340,8 @@ charts/dabir
 Dabir does **not** deploy PostgreSQL inside Kubernetes by default.
 It expects an external PostgreSQL database.
 
+Dabir also expects an S3-compatible object storage endpoint for attachments, such as MinIO, Ceph RGW, or a cloud S3-compatible service.
+
 Create namespace:
 
 ```bash
@@ -192,7 +353,9 @@ Create secret:
 ```bash
 kubectl -n dabir create secret generic dabir-secret \
   --from-literal=DB_PASSWORD='YOUR_DB_PASSWORD' \
-  --from-literal=JWT_SECRET='YOUR_LONG_RANDOM_JWT_SECRET'
+  --from-literal=JWT_SECRET='YOUR_LONG_RANDOM_JWT_SECRET' \
+  --from-literal=S3_ACCESS_KEY='YOUR_S3_ACCESS_KEY' \
+  --from-literal=S3_SECRET_KEY='YOUR_S3_SECRET_KEY'
 ```
 
 Install with Helm:
@@ -205,6 +368,43 @@ helm upgrade --install dabir charts/dabir \
 ```
 
 Run database migrations separately against the external PostgreSQL database.
+
+---
+
+## Helm S3 Values
+
+The Helm chart supports S3 configuration through API environment variables and secrets.
+
+Example values:
+
+```yaml
+api:
+  env:
+    S3_ENDPOINT: "https://s3.example.com"
+    S3_REGION: "us-east-1"
+    S3_BUCKET: "dabir-attachments"
+    S3_USE_SSL: "true"
+    S3_FORCE_PATH_STYLE: "true"
+    S3_PRESIGNED_URL_TTL_MINUTES: "15"
+    S3_MAX_UPLOAD_SIZE_MB: "20"
+
+  secrets:
+    create: true
+    existingSecret: ""
+    DB_PASSWORD: "change-this-db-password"
+    JWT_SECRET: "change-this-jwt-secret"
+    S3_ACCESS_KEY: "change-this-s3-access-key"
+    S3_SECRET_KEY: "change-this-s3-secret-key"
+```
+
+When using an existing secret, it must contain:
+
+```text
+DB_PASSWORD
+JWT_SECRET
+S3_ACCESS_KEY
+S3_SECRET_KEY
+```
 
 ---
 
@@ -235,8 +435,11 @@ Upload Excel
 Preview and validate
 Detect duplicates
 Commit import
-Continue numbering from the maximum imported number
+Preserve original letter numbers
+Continue numbering from the imported data
 ```
+
+The importer supports real-world legacy files and can preserve original manual letter numbers instead of forcing them into a generated numeric format.
 
 ---
 
@@ -308,6 +511,13 @@ Render Helm templates:
 helm template dabir charts/dabir -n dabir
 ```
 
+Check rendered S3 environment variables:
+
+```bash
+helm template dabir charts/dabir -n dabir > /tmp/dabir-rendered.yaml
+grep -n "S3_" /tmp/dabir-rendered.yaml
+```
+
 ---
 
 ## Documentation
@@ -332,11 +542,11 @@ docs/wiki/full-project-guide.md
 - Better runtime configuration for web deployment
 - Print / export letter confirmation
 - Advanced letter search and filters
-- Editable settings page
 - Full i18n coverage
 - Migration Job support in Helm
-- GitHub Actions CI
 - Release automation
+- Attachment thumbnails and richer preview experience
+- Export letters to Excel / PDF
 
 ---
 

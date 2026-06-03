@@ -334,6 +334,14 @@ export default function LettersPage() {
                               </Button>
 
                               {canDelete ? (
+                                <Link href={`/letters/${letter.id}/edit`}>
+                                  <Button variant="outline" size="sm">
+                                    ویرایش
+                                  </Button>
+                                </Link>
+                              ) : null}
+
+                              {canDelete ? (
                                 <Button
                                   variant="destructive"
                                   size="sm"
@@ -470,6 +478,14 @@ function LetterPreviewDialog({
               <Button variant="outline" onClick={onClose}>
                 {t.commonCancel}
               </Button>
+
+              {canDelete && !letter.is_deleted ? (
+                <Link href={`/letters/${letter.id}/edit`}>
+                  <Button variant="outline" onClick={onClose}>
+                    ویرایش
+                  </Button>
+                </Link>
+              ) : null}
 
               {canDelete && !letter.is_deleted ? (
                 <Button

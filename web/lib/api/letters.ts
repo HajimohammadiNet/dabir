@@ -51,6 +51,27 @@ export async function createLetter(token: string, input: CreateLetterInput) {
   return apiClient.post<Letter>("/letters/", input, token);
 }
 
+export async function getLetter(token: string, id: string) {
+  return apiClient.get<Letter>(`/letters/${id}`, token);
+}
+
+export type UpdateLetterInput = {
+  display_letter_number?: string | null;
+  title: string;
+  letter_date: string;
+  sender: string;
+  receiver: string;
+  description?: string | null;
+};
+
+export async function updateLetter(
+  token: string,
+  id: string,
+  input: UpdateLetterInput
+) {
+  return apiClient.patch<Letter>(`/letters/${id}`, input, token);
+}
+
 export async function deleteLetter(token: string, id: string) {
   return apiClient.delete<{ deleted: boolean }>(`/letters/${id}`, token);
 }

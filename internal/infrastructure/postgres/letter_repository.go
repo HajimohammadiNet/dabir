@@ -397,22 +397,24 @@ func (r *LetterRepository) Update(ctx context.Context, l *letter.Letter) error {
 	const query = `
 		UPDATE letters
 		SET
-			title = $1,
-			letter_date = $2,
-			sender = $3,
-			receiver = $4,
-			destination = $4,
-			description = $5,
-			updated_by = $6,
+			display_letter_number = $1,
+			title = $2,
+			letter_date = $3,
+			sender = $4,
+			receiver = $5,
+			destination = $5,
+			description = $6,
+			updated_by = $7,
 			updated_at = NOW()
-		WHERE id = $7
-		AND is_deleted = false
+		WHERE id = $8
+		  AND is_deleted = false
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRow(
 		ctx,
 		query,
+		l.DisplayLetterNumber,
 		l.Title,
 		l.LetterDate,
 		l.Sender,
@@ -425,6 +427,10 @@ func (r *LetterRepository) Update(ctx context.Context, l *letter.Letter) error {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return pgx.ErrNoRows
+		}
+
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
+			return fmt.Errorf("display_letter_number already exists")
 		}
 
 		return fmt.Errorf("failed to update letter: %w", err)

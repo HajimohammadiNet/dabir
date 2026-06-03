@@ -22,6 +22,8 @@ type UpdateLetterInput struct {
 	Title      string `json:"title"`
 	LetterDate string `json:"letter_date"`
 
+	DisplayLetterNumber *string `json:"display_letter_number"`
+
 	Sender   string `json:"sender"`
 	Receiver string `json:"receiver"`
 
@@ -61,6 +63,32 @@ func (uc *UpdateLetterUseCase) Execute(ctx context.Context, input UpdateLetterIn
 		return nil, ErrLetterNotFound
 	}
 
+	cfg := uc.configProvider.Get(ctx)
+
+	if cfg.Mode == NumberingModeManual {
+		if input.DisplayLetterNumber == nil || *input.DisplayLetterNumber == "" {
+			return nil, errors.New("display_letter_number is required in manual numbering mode")
+		}
+
+		currentDisplayNumber := ""
+		if l.DisplayLetterNumber != nil {
+			currentDisplayNumber = *l.DisplayLetterNumber
+		}
+
+		if *input.DisplayLetterNumber != currentDisplayNumber {
+			exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, *input.DisplayLetterNumber)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check display letter number uniqueness: %w", err)
+			}
+
+			if exists {
+				return nil, errors.New("display_letter_number already exists")
+			}
+		}
+
+		l.DisplayLetterNumber = input.DisplayLetterNumber
+	}
+
 	l.Title = input.Title
 	l.LetterDate = letterDate
 	l.Sender = input.Sender
@@ -72,7 +100,6 @@ func (uc *UpdateLetterUseCase) Execute(ctx context.Context, input UpdateLetterIn
 		return nil, fmt.Errorf("failed to update letter: %w", err)
 	}
 
-	cfg := uc.configProvider.Get(ctx)
 	dto := ToLetterDTO(*l, cfg)
 
 	return &dto, nil
@@ -83,6 +110,7 @@ func normalizeUpdateLetterInput(input UpdateLetterInput) UpdateLetterInput {
 	input.LetterDate = strings.TrimSpace(input.LetterDate)
 	input.Sender = strings.TrimSpace(input.Sender)
 	input.Receiver = strings.TrimSpace(input.Receiver)
+	input.DisplayLetterNumber = normalizeOptionalString(input.DisplayLetterNumber)
 
 	if input.Description != nil {
 		desc := strings.TrimSpace(*input.Description)

@@ -7,9 +7,10 @@ import (
 )
 
 type Config struct {
-	App  AppConfig
-	DB   DatabaseConfig
-	Auth AuthConfig
+	App     AppConfig
+	DB      DatabaseConfig
+	Auth    AuthConfig
+	Storage StorageConfig
 }
 
 type AuthConfig struct {
@@ -37,6 +38,18 @@ type DatabaseConfig struct {
 	SSLMode      string `env:"DB_SSLMODE" envDefault:"disable"`
 	MaxOpenConns int32  `env:"DB_MAX_OPEN_CONNS" envDefault:"25"`
 	MaxIdleConns int32  `env:"DB_MAX_IDLE_CONNS" envDefault:"10"`
+}
+
+type StorageConfig struct {
+	Endpoint               string `env:"S3_ENDPOINT" envDefault:"http://localhost:9000"`
+	Region                 string `env:"S3_REGION" envDefault:"us-east-1"`
+	Bucket                 string `env:"S3_BUCKET" envDefault:"dabir-attachments"`
+	AccessKey              string `env:"S3_ACCESS_KEY"`
+	SecretKey              string `env:"S3_SECRET_KEY"`
+	UseSSL                 bool   `env:"S3_USE_SSL" envDefault:"false"`
+	ForcePathStyle         bool   `env:"S3_FORCE_PATH_STYLE" envDefault:"true"`
+	PresignedURLTTLMinutes int    `env:"S3_PRESIGNED_URL_TTL_MINUTES" envDefault:"15"`
+	MaxUploadSizeMB        int64  `env:"S3_MAX_UPLOAD_SIZE_MB" envDefault:"20"`
 }
 
 func Load() (*Config, error) {

@@ -29,33 +29,34 @@ func NewDeleteAttachmentUseCase(
 	}
 }
 
-func (uc *DeleteAttachmentUseCase) Execute(ctx context.Context, input DeleteAttachmentInput) error {
+func (uc *DeleteAttachmentUseCase) Execute(ctx context.Context, input DeleteAttachmentInput) (*AttachmentDTO, error) {
 	if input.LetterID == "" {
-		return fmt.Errorf("letter id is required")
+		return nil, fmt.Errorf("letter id is required")
 	}
 
 	if input.AttachmentID == "" {
-		return fmt.Errorf("attachment id is required")
+		return nil, fmt.Errorf("attachment id is required")
 	}
 
 	if input.ActorUserID == "" {
-		return fmt.Errorf("actor user id is required")
+		return nil, fmt.Errorf("actor user id is required")
 	}
 
 	item, err := uc.attachmentRepo.FindByID(ctx, input.AttachmentID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if item == nil || item.IsDeleted || item.LetterID != input.LetterID {
-		return fmt.Errorf("attachment not found")
+		return nil, fmt.Errorf("attachment not found")
 	}
 
 	if err := uc.attachmentRepo.SoftDelete(ctx, input.AttachmentID, input.ActorUserID); err != nil {
-		return err
+		return nil, err
 	}
 
 	_ = uc.storageClient.DeleteObject(ctx, item.ObjectKey)
 
-	return nil
+	dto := ToAttachmentDTO(*item)
+	return &dto, nil
 }

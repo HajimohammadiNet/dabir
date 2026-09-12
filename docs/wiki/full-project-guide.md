@@ -40,13 +40,14 @@ Dabir is designed for teams that need a simple but reliable internal system for 
 
 ## Overview
 
-Dabir provides a backend API for managing organization letter numbers.
+Dabir provides a backend API and web UI for managing incoming and outgoing organization letters.
 
 In many organizations, letter numbers are still managed manually in spreadsheets. This approach can become risky over time because it has limited access control, limited auditability, and poor concurrency safety.
 
 Dabir solves this by providing:
 
 - A PostgreSQL-backed letter registry
+- Incoming and outgoing letter directions
 - Safe incremental numbering
 - Role-based access control
 - Initial setup wizard
@@ -55,7 +56,7 @@ Dabir solves this by providing:
 - Audit logs for important actions
 - Docker-based local development
 
-The current version focuses only on the backend API. A UI/admin panel can be added later.
+The current version includes both the backend API and a responsive Persian/English web interface.
 
 ---
 
@@ -68,6 +69,8 @@ The current version focuses only on the backend API. A UI/admin panel can be add
 - Role-based access control
 - Superuser user management
 - Letter create, read, update, and soft delete
+- Direction-aware incoming/outgoing lists, numbering, and manual suggestions
+- Private S3-compatible letter attachments
 - Readonly access for users who only need visibility
 - Public settings endpoint
 - Audit logging
@@ -275,7 +278,10 @@ make compose-up
 This starts:
 
 - PostgreSQL
+- MinIO object storage
+- an idempotent private-bucket initialization job
 - Dabir API
+- Dabir web application
 
 ### 4. Run database migrations
 
@@ -341,6 +347,17 @@ DB_MAX_IDLE_CONNS=10
 
 JWT_SECRET=change-this-secret
 JWT_ACCESS_TOKEN_TTL_MINUTES=60
+
+S3_ENDPOINT=http://localhost:9000
+S3_PUBLIC_ENDPOINT=http://localhost:9000
+S3_REGION=us-east-1
+S3_BUCKET=dabir-attachments
+S3_ACCESS_KEY=dabir
+S3_SECRET_KEY=dabir_minio_secret
+S3_USE_SSL=false
+S3_FORCE_PATH_STYLE=true
+S3_PRESIGNED_URL_TTL_MINUTES=15
+S3_MAX_UPLOAD_SIZE_MB=20
 ```
 
 ### Application Variables
@@ -371,6 +388,33 @@ JWT_ACCESS_TOKEN_TTL_MINUTES=60
 |---|---|---|
 | `JWT_SECRET` | Secret used to sign JWT tokens | Required |
 | `JWT_ACCESS_TOKEN_TTL_MINUTES` | Access token lifetime in minutes | `60` |
+
+### Object Storage Variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `S3_ENDPOINT` | Backend-reachable S3 endpoint | `http://localhost:9000` |
+| `S3_PUBLIC_ENDPOINT` | Optional browser-reachable endpoint used when signing attachment URLs | `S3_ENDPOINT` |
+| `S3_REGION` | S3 region | `us-east-1` |
+| `S3_BUCKET` | Private attachment bucket | `dabir-attachments` |
+| `S3_ACCESS_KEY` | Backend S3 access key | Empty |
+| `S3_SECRET_KEY` | Backend S3 secret key | Empty |
+| `S3_USE_SSL` | TLS fallback when an endpoint omits its scheme | `false` |
+| `S3_FORCE_PATH_STYLE` | Use path-style bucket URLs | `true` |
+| `S3_PRESIGNED_URL_TTL_MINUTES` | Attachment URL lifetime | `15` |
+| `S3_MAX_UPLOAD_SIZE_MB` | Per-file upload limit | `20` |
+
+Docker Compose pins the official Quay MinIO server image to
+`RELEASE.2025-09-07T16-13-09Z` and the MinIO client image to
+`RELEASE.2025-08-13T08-35-41Z`. The API uses `http://minio:9000` on the
+Compose network, while `S3_PUBLIC_ENDPOINT=http://localhost:9000` makes its
+presigned URLs usable in the host browser. A one-shot init service creates the
+bucket if absent and enforces a private anonymous-access policy.
+
+For Helm, set `S3_ENDPOINT` to the endpoint resolvable from API pods and
+`S3_PUBLIC_ENDPOINT` to the externally reachable S3 endpoint. They may be the
+same URL when no internal/external split exists. S3 credentials remain API
+secrets and must never be exposed through `NEXT_PUBLIC_*` variables.
 
 ---
 
@@ -666,6 +710,8 @@ curl -X PATCH "http://localhost:8080/api/v1/users/USER_ID/activate" \
 
 Letter endpoints require authentication.
 
+Letters have a `direction` of `incoming` or `outgoing`. Omitting direction preserves the original API behavior and means `incoming`. Existing database rows are migrated to `incoming`. List filters, fixed/yearly sequences, manual duplicate checks, and smart suggestions are scoped to direction.
+
 ### Create a letter
 
 Allowed roles:
@@ -681,8 +727,9 @@ curl -X POST http://localhost:8080/api/v1/letters/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
+    "direction": "outgoing",
     "title": "Contract Review Request",
-    "letter_date": "2026-05-19",
+    "letter_date": "1405/02/29",
     "sender": "Finance Department",
     "receiver": "Legal Department",
     "description": "Request for contract review"
@@ -696,6 +743,7 @@ Example response:
   "success": true,
   "data": {
     "id": "LETTER_ID",
+    "direction": "outgoing",
     "letter_number": 1,
     "formatted_letter_number": "DABIR-000001",
     "title": "Contract Review Request",
@@ -722,6 +770,20 @@ Allowed roles:
 
 ```bash
 curl http://localhost:8080/api/v1/letters/ \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+The request above lists incoming letters. To list outgoing letters:
+
+```bash
+curl "http://localhost:8080/api/v1/letters/?direction=outgoing" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+Direction-aware manual suggestion example:
+
+```bash
+curl "http://localhost:8080/api/v1/letters/number-suggestion?direction=outgoing&prefix=۴۰۵-ق-" \
   -H "Authorization: Bearer $TOKEN" | jq
 ```
 
@@ -804,7 +866,7 @@ curl -X PATCH "http://localhost:8080/api/v1/letters/LETTER_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "title": "Updated Contract Review Request",
-    "letter_date": "2026-05-19",
+    "letter_date": "1405/02/29",
     "sender": "Finance Department",
     "receiver": "Legal Department",
     "description": "Updated description"
@@ -840,7 +902,9 @@ Example response:
 
 ## Excel Import
 
-Dabir supports importing existing letters from Excel files.
+Dabir supports importing existing incoming letters from Excel files.
+
+Outgoing Excel import is not included in this release. The existing importer always creates `incoming` rows so legacy behavior remains explicit and backward-compatible.
 
 This is useful when migrating from spreadsheet-based letter tracking.
 
@@ -1018,6 +1082,8 @@ user.deactivated
 letter.created
 letter.updated
 letter.deleted
+letter.attachment_uploaded
+letter.attachment_deleted
 letters.import_previewed
 letters.import_committed
 ```

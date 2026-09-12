@@ -154,6 +154,10 @@ func (uc *InitializeUseCase) saveInitialSettings(ctx context.Context, input Init
 		return err
 	}
 
+	if err := uc.settingsRepo.Set(ctx, settings.KeyOutgoingLetterConfig, letterConfigValue); err != nil {
+		return err
+	}
+
 	return nil
 }
 

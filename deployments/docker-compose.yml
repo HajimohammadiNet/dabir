@@ -22,7 +22,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: dabir-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -38,13 +38,32 @@ services:
       test:
         [
           "CMD",
-          "mc",
-          "ready",
-          "local"
+          "curl",
+          "--fail",
+          "http://localhost:9000/minio/health/live"
         ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: dabir-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-dabir}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-dabir_minio_secret}
+      S3_BUCKET: ${S3_BUCKET:-dabir-attachments}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "local/$${S3_BUCKET}"
+        mc anonymous set none "local/$${S3_BUCKET}"
 
   api:
     build:
@@ -57,6 +76,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     environment:
       APP_NAME: ${APP_NAME:-dabir}
       APP_ENV: ${APP_ENV:-production}
@@ -79,7 +100,8 @@ services:
       CORS_ALLOWED_METHODS: ${CORS_ALLOWED_METHODS:-GET,POST,PATCH,DELETE,OPTIONS}
       CORS_ALLOWED_HEADERS: ${CORS_ALLOWED_HEADERS:-Accept,Authorization,Content-Type,X-CSRF-Token,X-Request-ID}
 
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-dabir-attachments}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-dabir}
@@ -91,6 +113,11 @@ services:
 
     ports:
       - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/readyz >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   web:
     build:
@@ -101,13 +128,19 @@ services:
     container_name: dabir-web
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
     ports:
       - "${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
 volumes:
   dabir_postgres_data:

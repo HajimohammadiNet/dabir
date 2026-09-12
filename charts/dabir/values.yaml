@@ -45,7 +45,10 @@ api:
     CORS_ALLOWED_METHODS: "GET,POST,PATCH,DELETE,OPTIONS"
     CORS_ALLOWED_HEADERS: "Accept,Authorization,Content-Type,X-CSRF-Token,X-Request-ID"
 
+    # Endpoint used by the API pod for object operations.
     S3_ENDPOINT: "http://minio.minio.svc.cluster.local:9000"
+    # Endpoint embedded and signed into URLs returned to browsers.
+    S3_PUBLIC_ENDPOINT: "https://s3.example.com"
     S3_REGION: "us-east-1"
     S3_BUCKET: "dabir-attachments"
     S3_USE_SSL: "false"

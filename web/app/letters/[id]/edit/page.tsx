@@ -15,9 +15,11 @@ import {
   uploadLetterAttachments,
 } from "@/lib/api/attachments";
 import { getLetter, updateLetter } from "@/lib/api/letters";
+import { getPublicSettings } from "@/lib/api/settings";
 import { useI18n } from "@/lib/i18n/i18n-context";
 import type { LetterAttachment } from "@/types/attachment";
-import type { Letter } from "@/types/letter";
+import type { Letter, LetterDirection } from "@/types/letter";
+import type { NumberingMode } from "@/types/settings";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,15 +33,22 @@ import {
 } from "@/components/ui/card";
 import { JalaliDatePicker } from "@/components/common/jalali-date-picker";
 
-export default function EditLetterPage() {
+export function EditLetterPage({
+  direction,
+}: {
+  direction: LetterDirection;
+}) {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { token } = useAuth();
   const { t } = useI18n();
 
   const letterID = params.id;
+  const routeBase = direction === "outgoing" ? "/outgoing-letters" : "/letters";
 
   const [letter, setLetter] = useState<Letter | null>(null);
+  const [numberingMode, setNumberingMode] =
+    useState<NumberingMode>("fixed_prefix");
 
   const [displayLetterNumber, setDisplayLetterNumber] = useState("");
   const [title, setTitle] = useState("");
@@ -67,7 +76,23 @@ export default function EditLetterPage() {
     setLoading(true);
 
     try {
-      const result = await getLetter(token, letterID);
+      const [result, settings] = await Promise.all([
+        getLetter(token, letterID),
+        getPublicSettings(),
+      ]);
+
+      if (result.direction !== direction) {
+        const correctBase =
+          result.direction === "outgoing" ? "/outgoing-letters" : "/letters";
+        router.replace(`${correctBase}/${result.id}/edit`);
+        return;
+      }
+
+      setNumberingMode(
+        direction === "outgoing"
+          ? settings.outgoing_letter_config.numbering_mode
+          : settings.letter_config.numbering_mode
+      );
 
       setLetter(result);
       setDisplayLetterNumber(result.formatted_letter_number || "");
@@ -81,7 +106,7 @@ export default function EditLetterPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, letterID]);
+  }, [token, letterID, direction, router]);
 
   const loadAttachments = useCallback(async () => {
     if (!token || !letterID) return;
@@ -130,7 +155,8 @@ export default function EditLetterPage() {
 
     try {
       const updated = await updateLetter(token, letterID, {
-        display_letter_number: displayLetterNumber.trim(),
+        display_letter_number:
+          numberingMode === "manual" ? displayLetterNumber.trim() : null,
         title,
         letter_date: letterDate,
         sender,
@@ -138,10 +164,10 @@ export default function EditLetterPage() {
         description: description.trim() || null,
       });
 
-      toast.success("نامه با موفقیت ویرایش شد");
+      toast.success(t.letterUpdated);
       setLetter(updated);
 
-      router.push("/letters");
+      router.push(routeBase);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update letter");
     } finally {
@@ -175,7 +201,7 @@ export default function EditLetterPage() {
     try {
       await uploadLetterAttachments(token, letterID, selectedAttachmentFiles);
 
-      toast.success("فایل‌های پیوست با موفقیت آپلود شدند");
+      toast.success(t.attachmentsUploaded);
       setSelectedAttachmentFiles([]);
 
       await loadAttachments();
@@ -190,6 +216,7 @@ export default function EditLetterPage() {
 
   async function handleDeleteAttachment(attachment: LetterAttachment) {
     if (!token || !letterID) return;
+    if (!window.confirm(t.confirmDeleteAttachment)) return;
 
     setDeletingAttachmentID(attachment.id);
 
@@ -200,7 +227,7 @@ export default function EditLetterPage() {
         current.filter((item) => item.id !== attachment.id)
       );
 
-      toast.success("فایل پیوست حذف شد");
+      toast.success(t.attachmentDeleted);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to delete attachment"
@@ -216,17 +243,19 @@ export default function EditLetterPage() {
         <div className="max-w-3xl space-y-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              ویرایش نامه
+              {direction === "outgoing"
+                ? t.editOutgoingLetter
+                : t.editIncomingLetter}
             </h1>
             <p className="text-muted-foreground">
-              اطلاعات نامه را ویرایش و ذخیره کنید.
+              {t.editLetterDescription}
             </p>
           </div>
 
           {letter ? (
             <Card>
               <CardHeader>
-                <CardTitle>شماره فعلی نامه</CardTitle>
+                <CardTitle>{t.currentLetterNumber}</CardTitle>
               </CardHeader>
               <CardContent>
                 <LetterNumberText
@@ -249,6 +278,7 @@ export default function EditLetterPage() {
                 </div>
               ) : (
                 <form id="edit-letter-form" onSubmit={handleSubmit} className="space-y-4">
+                  {numberingMode === "manual" ? (
                   <div className="space-y-2">
                     <Label htmlFor="display_letter_number">
                       {t.displayLetterNumber}
@@ -267,6 +297,7 @@ export default function EditLetterPage() {
                       }}
                     />
                   </div>
+                  ) : null}
 
                   <div className="space-y-2">
                     <Label htmlFor="title">{t.letterTitle}</Label>
@@ -325,12 +356,12 @@ export default function EditLetterPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>پیوست‌ها / اسکن نامه</CardTitle>
+              <CardTitle>{t.attachments}</CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
               <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-                <Label htmlFor="attachments">افزودن فایل جدید</Label>
+                <Label htmlFor="attachments">{t.addNewFiles}</Label>
 
                 <Input
                   id="attachments"
@@ -346,8 +377,7 @@ export default function EditLetterPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">
-                    آپلود فایل اختیاری است. فرمت‌های مجاز: PDF, JPG, PNG. برای
-                    جایگزینی فایل، فایل قبلی را حذف و فایل جدید را آپلود کنید.
+                    {t.attachmentUploadHelp}
                   </p>
 
                   <Button
@@ -359,7 +389,7 @@ export default function EditLetterPage() {
                     }
                     onClick={() => void handleUploadAttachments()}
                   >
-                    {uploadingAttachments ? t.commonLoading : "آپلود فایل"}
+                    {uploadingAttachments ? t.commonLoading : t.uploadFiles}
                   </Button>
                 </div>
 
@@ -375,7 +405,7 @@ export default function EditLetterPage() {
               </div>
 
               <div className="space-y-3">
-                <div className="font-semibold">فایل‌های فعلی</div>
+                <div className="font-semibold">{t.currentFiles}</div>
 
                 {attachmentsLoading ? (
                   <div className="text-sm text-muted-foreground">
@@ -383,7 +413,7 @@ export default function EditLetterPage() {
                   </div>
                 ) : attachments.length === 0 ? (
                   <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-                    فایلی برای این نامه ثبت نشده است.
+                    {t.noAttachments}
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -409,7 +439,7 @@ export default function EditLetterPage() {
                             size="sm"
                             onClick={() => void handleOpenAttachment(attachment)}
                           >
-                            مشاهده
+                            {t.viewFile}
                           </Button>
 
                           <Button
@@ -437,13 +467,13 @@ export default function EditLetterPage() {
                         form="edit-letter-form"
                         disabled={saving}
                     >
-                        {saving ? t.commonLoading : "ذخیره تغییرات"}
+                        {saving ? t.commonLoading : t.saveChanges}
                     </Button>
 
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => router.push("/letters")}
+                        onClick={() => router.push(routeBase)}
                         disabled={saving}
                     >
                         {t.commonCancel}
@@ -456,6 +486,10 @@ export default function EditLetterPage() {
       </AppShell>
     </ProtectedRoute>
   );
+}
+
+export default function IncomingEditLetterPage() {
+  return <EditLetterPage direction="incoming" />;
 }
 
 function formatFileSize(sizeBytes: number) {

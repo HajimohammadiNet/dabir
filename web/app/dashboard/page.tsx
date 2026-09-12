@@ -14,9 +14,11 @@ import { useI18n } from "@/lib/i18n/i18n-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type DashboardStats = {
-  totalLetters: number | null;
+  totalIncomingLetters: number | null;
+  totalOutgoingLetters: number | null;
   usersCount: number | null;
-  lastNumber: string | null;
+  latestIncomingNumber: string | null;
+  latestOutgoingNumber: string | null;
 };
 
 export default function DashboardPage() {
@@ -24,9 +26,11 @@ export default function DashboardPage() {
   const { t } = useI18n();
 
   const [stats, setStats] = useState<DashboardStats>({
-    totalLetters: null,
+    totalIncomingLetters: null,
+    totalOutgoingLetters: null,
     usersCount: null,
-    lastNumber: null,
+    latestIncomingNumber: null,
+    latestOutgoingNumber: null,
   });
   const [loading, setLoading] = useState(false);
 
@@ -36,12 +40,22 @@ export default function DashboardPage() {
     setLoading(true);
 
     try {
-      const lettersResult = await listLetters(token, {
-        page: 1,
-        page_size: 1,
-        sort_by: "created_at",
-        sort_order: "desc",
-      });
+      const [incomingResult, outgoingResult] = await Promise.all([
+        listLetters(token, {
+          direction: "incoming",
+          page: 1,
+          page_size: 1,
+          sort_by: "created_at",
+          sort_order: "desc",
+        }),
+        listLetters(token, {
+          direction: "outgoing",
+          page: 1,
+          page_size: 1,
+          sort_by: "created_at",
+          sort_order: "desc",
+        }),
+      ]);
 
       let usersTotal: number | null = null;
 
@@ -55,11 +69,16 @@ export default function DashboardPage() {
       }
 
       setStats({
-        totalLetters: lettersResult.total,
+        totalIncomingLetters: incomingResult.total,
+        totalOutgoingLetters: outgoingResult.total,
         usersCount: usersTotal,
-        lastNumber:
-          lettersResult.items.length > 0
-            ? lettersResult.items[0].formatted_letter_number
+        latestIncomingNumber:
+          incomingResult.items.length > 0
+            ? incomingResult.items[0].formatted_letter_number
+            : null,
+        latestOutgoingNumber:
+          outgoingResult.items.length > 0
+            ? outgoingResult.items[0].formatted_letter_number
             : null,
       });
     } catch (err) {
@@ -92,13 +111,52 @@ export default function DashboardPage() {
             <p className="text-muted-foreground">{t.dashboardDescription}</p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <Card>
               <CardHeader>
-                <CardTitle>{t.totalLetters}</CardTitle>
+                <CardTitle>{t.totalIncomingLetters}</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-bold" dir="ltr">
-                {loading ? "..." : stats.totalLetters ?? 0}
+                {loading ? "..." : stats.totalIncomingLetters ?? 0}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.totalOutgoingLetters}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-bold" dir="ltr">
+                {loading ? "..." : stats.totalOutgoingLetters ?? 0}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.latestIncomingNumber}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-bold">
+                {loading ? (
+                  "..."
+                ) : stats.latestIncomingNumber ? (
+                  <LetterNumberText value={stats.latestIncomingNumber} />
+                ) : (
+                  "-"
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t.latestOutgoingNumber}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-bold">
+                {loading ? (
+                  "..."
+                ) : stats.latestOutgoingNumber ? (
+                  <LetterNumberText value={stats.latestOutgoingNumber} />
+                ) : (
+                  "-"
+                )}
               </CardContent>
             </Card>
 
@@ -112,21 +170,6 @@ export default function DashboardPage() {
                   : stats.usersCount !== null
                     ? stats.usersCount
                     : "-"}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.lastNumber}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-bold">
-                {loading ? (
-                  "..."
-                ) : stats.lastNumber ? (
-                  <LetterNumberText value={stats.lastNumber} />
-                ) : (
-                  "-"
-                )}
               </CardContent>
             </Card>
           </div>

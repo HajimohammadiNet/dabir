@@ -99,6 +99,14 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 	)
 
 	letterRepo := postgres.NewLetterRepository(db)
+	letterConfigProvider := lettersapp.NewLetterConfigProvider(settingsRepo)
+
+	createLetterUseCase := lettersapp.NewCreateLetterUseCase(letterRepo, letterConfigProvider)
+	listLettersUseCase := lettersapp.NewListLettersUseCase(letterRepo, letterConfigProvider)
+	getLetterUseCase := lettersapp.NewGetLetterUseCase(letterRepo, letterConfigProvider)
+	updateLetterUseCase := lettersapp.NewUpdateLetterUseCase(letterRepo, letterConfigProvider)
+	deleteLetterUseCase := lettersapp.NewDeleteLetterUseCase(letterRepo)
+	suggestLetterNumberUseCase := lettersapp.NewSuggestLetterNumberUseCase(letterRepo)
 
 	attachmentRepo := postgres.NewAttachmentRepository(db)
 
@@ -135,6 +143,8 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 		listAttachmentsUseCase,
 		getAttachmentDownloadURLUseCase,
 		deleteAttachmentUseCase,
+		getLetterUseCase,
+		auditLogger,
 	)
 
 	importRepo := postgres.NewImportJobRepository(db)
@@ -158,15 +168,6 @@ func NewRouter(db *pgxpool.Pool, cfg *config.Config, logger *slog.Logger) http.H
 		commitLettersImportUseCase,
 		getImportJobUseCase,
 	)
-	letterConfigProvider := lettersapp.NewLetterConfigProvider(settingsRepo)
-
-	createLetterUseCase := lettersapp.NewCreateLetterUseCase(letterRepo, letterConfigProvider)
-	listLettersUseCase := lettersapp.NewListLettersUseCase(letterRepo, letterConfigProvider)
-	getLetterUseCase := lettersapp.NewGetLetterUseCase(letterRepo, letterConfigProvider)
-	updateLetterUseCase := lettersapp.NewUpdateLetterUseCase(letterRepo, letterConfigProvider)
-	deleteLetterUseCase := lettersapp.NewDeleteLetterUseCase(letterRepo)
-	suggestLetterNumberUseCase := lettersapp.NewSuggestLetterNumberUseCase(letterRepo)
-
 	letterHandler := handlers.NewLetterHandler(
 		createLetterUseCase,
 		listLettersUseCase,

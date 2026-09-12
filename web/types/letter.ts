@@ -1,5 +1,8 @@
+export type LetterDirection = "incoming" | "outgoing";
+
 export type Letter = {
   id: string;
+  direction: LetterDirection;
   letter_number: number;
   formatted_letter_number: string;
   display_letter_number?: string | null;

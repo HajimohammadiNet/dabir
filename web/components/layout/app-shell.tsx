@@ -30,7 +30,12 @@ const navItems: NavItem[] = [
   },
   {
     href: "/letters",
-    labelKey: "letters",
+    labelKey: "incomingLetters",
+    roles: ["superuser", "editor", "readonly"],
+  },
+  {
+    href: "/outgoing-letters",
+    labelKey: "outgoingLetters",
     roles: ["superuser", "editor", "readonly"],
   },
   {

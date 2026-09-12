@@ -63,7 +63,7 @@ func (uc *UpdateLetterUseCase) Execute(ctx context.Context, input UpdateLetterIn
 		return nil, ErrLetterNotFound
 	}
 
-	cfg := uc.configProvider.Get(ctx)
+	cfg := uc.configProvider.Get(ctx, l.Direction)
 
 	if cfg.Mode == NumberingModeManual {
 		if input.DisplayLetterNumber == nil || *input.DisplayLetterNumber == "" {
@@ -76,7 +76,7 @@ func (uc *UpdateLetterUseCase) Execute(ctx context.Context, input UpdateLetterIn
 		}
 
 		if *input.DisplayLetterNumber != currentDisplayNumber {
-			exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, *input.DisplayLetterNumber)
+			exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, l.Direction, *input.DisplayLetterNumber)
 			if err != nil {
 				return nil, fmt.Errorf("failed to check display letter number uniqueness: %w", err)
 			}

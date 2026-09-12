@@ -32,7 +32,7 @@ func (uc *GetLetterUseCase) Execute(ctx context.Context, id string) (*LetterDTO,
 		return nil, ErrLetterNotFound
 	}
 
-	cfg := uc.configProvider.Get(ctx)
+	cfg := uc.configProvider.Get(ctx, l.Direction)
 	dto := ToLetterDTO(*l, cfg)
 
 	return &dto, nil

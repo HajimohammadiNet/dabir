@@ -32,9 +32,11 @@ const (
 	ActionUserPasswordChanged = "user.password_changed"
 	ActionUserPasswordReset   = "user.password_reset"
 
-	ActionLetterCreated = "letter.created"
-	ActionLetterUpdated = "letter.updated"
-	ActionLetterDeleted = "letter.deleted"
+	ActionLetterCreated            = "letter.created"
+	ActionLetterUpdated            = "letter.updated"
+	ActionLetterDeleted            = "letter.deleted"
+	ActionLetterAttachmentUploaded = "letter.attachment_uploaded"
+	ActionLetterAttachmentDeleted  = "letter.attachment_deleted"
 
 	ActionLettersImportPreviewed = "letters.import_previewed"
 	ActionLettersImportCommitted = "letters.import_committed"

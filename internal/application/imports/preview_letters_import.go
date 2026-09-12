@@ -11,6 +11,7 @@ import (
 	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
 	"github.com/hajimohammadinet/dabir/internal/domain/importjob"
 	"github.com/hajimohammadinet/dabir/internal/domain/letter"
+	"github.com/hajimohammadinet/dabir/internal/shared/dateutil"
 )
 
 type PreviewLettersImportUseCase struct {
@@ -133,7 +134,9 @@ func (uc *PreviewLettersImportUseCase) validateDuplicates(ctx context.Context, r
 			continue
 		}
 
-		if firstRow, exists := seen[displayNumber]; exists {
+		normalizedDisplayNumber := dateutil.NormalizeDigits(displayNumber)
+
+		if firstRow, exists := seen[normalizedDisplayNumber]; exists {
 			result.Errors = append(result.Errors, ImportErrorDTO{
 				Row:     row.RowNumber,
 				Field:   "display_letter_number",
@@ -143,9 +146,9 @@ func (uc *PreviewLettersImportUseCase) validateDuplicates(ctx context.Context, r
 			continue
 		}
 
-		seen[displayNumber] = row.RowNumber
+		seen[normalizedDisplayNumber] = row.RowNumber
 
-		exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, displayNumber)
+		exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, letter.DirectionIncoming, displayNumber)
 		if err != nil {
 			return err
 		}

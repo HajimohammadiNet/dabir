@@ -2,8 +2,8 @@ apiVersion: v2
 name: dabir
 description: A Helm chart for Dabir letter numbering and registry system
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.6.0
+appVersion: "0.6.0"
 
 keywords:
   - dabir

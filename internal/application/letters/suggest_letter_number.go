@@ -15,7 +15,8 @@ type SuggestLetterNumberUseCase struct {
 }
 
 type SuggestLetterNumberInput struct {
-	Prefix string
+	Prefix    string
+	Direction letter.Direction
 }
 
 type SuggestLetterNumberOutput struct {
@@ -31,9 +32,16 @@ func NewSuggestLetterNumberUseCase(letterRepo letter.Repository) *SuggestLetterN
 }
 
 func (uc *SuggestLetterNumberUseCase) Execute(ctx context.Context, input SuggestLetterNumberInput) (*SuggestLetterNumberOutput, error) {
+	if input.Direction == "" {
+		input.Direction = letter.DirectionIncoming
+	}
+	if !input.Direction.IsValid() {
+		return nil, fmt.Errorf("direction must be incoming or outgoing")
+	}
+
 	prefix := normalizePersianArabicDigits(strings.TrimSpace(input.Prefix))
 
-	lastNumber, err := uc.letterRepo.FindLatestDisplayLetterNumberByPrefix(ctx, prefix)
+	lastNumber, err := uc.letterRepo.FindLatestDisplayLetterNumberByPrefix(ctx, input.Direction, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find latest letter number: %w", err)
 	}

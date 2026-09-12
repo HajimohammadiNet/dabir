@@ -24,8 +24,11 @@ func NewLetterRepository(db *pgxpool.Pool) *LetterRepository {
 	}
 }
 
-func (r *LetterRepository) NextNumber(ctx context.Context) (int64, error) {
-	const query = `SELECT nextval('letter_number_seq')`
+func (r *LetterRepository) NextNumber(ctx context.Context, direction letter.Direction) (int64, error) {
+	query := `SELECT nextval('letter_number_seq')`
+	if direction == letter.DirectionOutgoing {
+		query = `SELECT nextval('outgoing_letter_number_seq')`
+	}
 
 	var number int64
 	if err := r.db.QueryRow(ctx, query).Scan(&number); err != nil {
@@ -35,15 +38,16 @@ func (r *LetterRepository) NextNumber(ctx context.Context) (int64, error) {
 	return number, nil
 }
 
-func (r *LetterRepository) NextNumberForYear(ctx context.Context, jalaliYear int) (int64, error) {
+func (r *LetterRepository) NextNumberForYear(ctx context.Context, direction letter.Direction, jalaliYear int) (int64, error) {
 	const query = `
 		INSERT INTO letter_number_counters (
+			direction,
 			jalali_year,
 			last_number,
 			updated_at
 		)
-		VALUES ($1, 1, NOW())
-		ON CONFLICT (jalali_year)
+		VALUES ($1, $2, 1, NOW())
+		ON CONFLICT (direction, jalali_year)
 		DO UPDATE SET
 			last_number = letter_number_counters.last_number + 1,
 			updated_at = NOW()
@@ -51,43 +55,57 @@ func (r *LetterRepository) NextNumberForYear(ctx context.Context, jalaliYear int
 	`
 
 	var number int64
-	if err := r.db.QueryRow(ctx, query, jalaliYear).Scan(&number); err != nil {
+	if err := r.db.QueryRow(ctx, query, direction, jalaliYear).Scan(&number); err != nil {
 		return 0, fmt.Errorf("failed to get next yearly letter number: %w", err)
 	}
 
 	return number, nil
 }
 
-func (r *LetterRepository) ExistsByDisplayLetterNumber(ctx context.Context, displayNumber string) (bool, error) {
+func (r *LetterRepository) ExistsByDisplayLetterNumber(ctx context.Context, direction letter.Direction, displayNumber string) (bool, error) {
 	const query = `
 		SELECT EXISTS (
 			SELECT 1
 			FROM letters
-			WHERE display_letter_number = $1
+			WHERE direction = $1
+			  AND translate(
+			        BTRIM(display_letter_number),
+			        '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',
+			        '01234567890123456789'
+			      ) = translate(
+			        BTRIM($2),
+			        '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',
+			        '01234567890123456789'
+			      )
 			  AND is_deleted = false
 		)
 	`
 
 	var exists bool
-	if err := r.db.QueryRow(ctx, query, displayNumber).Scan(&exists); err != nil {
+	if err := r.db.QueryRow(ctx, query, direction, displayNumber).Scan(&exists); err != nil {
 		return false, fmt.Errorf("failed to check display letter number existence: %w", err)
 	}
 
 	return exists, nil
 }
 
-func (r *LetterRepository) FindLatestDisplayLetterNumberByPrefix(ctx context.Context, prefix string) (*string, error) {
+func (r *LetterRepository) FindLatestDisplayLetterNumberByPrefix(ctx context.Context, direction letter.Direction, prefix string) (*string, error) {
 	prefix = strings.TrimSpace(prefix)
 
 	const query = `
 		SELECT display_letter_number
 		FROM letters
-		WHERE is_deleted = false
+		WHERE direction = $1
+		  AND is_deleted = false
 		  AND display_letter_number IS NOT NULL
 		  AND display_letter_number <> ''
 		  AND (
-		    $1 = ''
-		    OR display_letter_number ILIKE $2 ESCAPE '\'
+		    $2 = ''
+		    OR translate(
+		        display_letter_number,
+		        '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',
+		        '01234567890123456789'
+		      ) ILIKE $3 ESCAPE '\'
 		  )
 		ORDER BY letter_number DESC, created_at DESC, id DESC
 		LIMIT 1
@@ -97,6 +115,7 @@ func (r *LetterRepository) FindLatestDisplayLetterNumberByPrefix(ctx context.Con
 	err := r.db.QueryRow(
 		ctx,
 		query,
+		direction,
 		prefix,
 		escapeLikePattern(prefix)+"%",
 	).Scan(&value)
@@ -123,6 +142,7 @@ func escapeLikePattern(value string) string {
 func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 	const query = `
 		INSERT INTO letters (
+			direction,
 			letter_number,
 			display_letter_number,
 			letter_year,
@@ -152,6 +172,7 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 			$11,
 			$12,
 			$13,
+			$14,
 			false
 		)
 		RETURNING id, created_at, updated_at
@@ -160,6 +181,7 @@ func (r *LetterRepository) Create(ctx context.Context, l *letter.Letter) error {
 	err := r.db.QueryRow(
 		ctx,
 		query,
+		l.Direction,
 		l.LetterNumber,
 		l.DisplayLetterNumber,
 		l.LetterYear,
@@ -186,6 +208,7 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 	const query = `
 		SELECT
 			id,
+			direction,
 			letter_number,
 			display_letter_number,
 			letter_year,
@@ -213,6 +236,7 @@ func (r *LetterRepository) FindByID(ctx context.Context, id string) (*letter.Let
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&l.ID,
+		&l.Direction,
 		&l.LetterNumber,
 		&l.DisplayLetterNumber,
 		&l.LetterYear,
@@ -263,9 +287,23 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 		where += " AND is_deleted = false"
 	}
 
+	if filter.Direction != "" {
+		where += fmt.Sprintf(" AND direction = $%d", argPos)
+		args = append(args, filter.Direction)
+		argPos++
+	}
+
 	if filter.Search != "" {
 		where += fmt.Sprintf(
-			" AND (title ILIKE $%d OR sender ILIKE $%d OR receiver ILIKE $%d OR registrar_name ILIKE $%d OR CAST(letter_number AS TEXT) ILIKE $%d OR display_letter_number ILIKE $%d)",
+			` AND (
+				title ILIKE $%d
+				OR sender ILIKE $%d
+				OR receiver ILIKE $%d
+				OR registrar_name ILIKE $%d
+				OR CAST(letter_number AS TEXT) ILIKE translate($%d, '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
+				OR translate(COALESCE(display_letter_number, ''), '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
+				   ILIKE translate($%d, '۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
+			)`,
 			argPos,
 			argPos,
 			argPos,
@@ -322,6 +360,7 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 	query := fmt.Sprintf(`
 		SELECT
 			id,
+			direction,
 			letter_number,
 			display_letter_number,
 			letter_year,
@@ -361,6 +400,7 @@ func (r *LetterRepository) List(ctx context.Context, filter letter.ListFilter) (
 
 		if err := rows.Scan(
 			&l.ID,
+			&l.Direction,
 			&l.LetterNumber,
 			&l.DisplayLetterNumber,
 			&l.LetterYear,
@@ -478,6 +518,7 @@ func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Lett
 
 	const query = `
 		INSERT INTO letters (
+			direction,
 			letter_number,
 			display_letter_number,
 			title,
@@ -490,7 +531,7 @@ func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Lett
 			created_by,
 			is_deleted
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $8, $9, false)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, false)
 	`
 
 	batch := &pgx.Batch{}
@@ -498,6 +539,7 @@ func (r *LetterRepository) BulkCreate(ctx context.Context, letters []letter.Lett
 	for _, l := range letters {
 		batch.Queue(
 			query,
+			l.Direction,
 			l.LetterNumber,
 			l.DisplayLetterNumber,
 			l.Title,
@@ -557,7 +599,8 @@ func (r *LetterRepository) FindExistingNumbers(ctx context.Context, numbers []in
 	const query = `
 		SELECT letter_number
 		FROM letters
-		WHERE letter_number = ANY($1)
+		WHERE direction = 'incoming'
+		  AND letter_number = ANY($1)
 	`
 
 	rows, err := r.db.Query(ctx, query, numbers)

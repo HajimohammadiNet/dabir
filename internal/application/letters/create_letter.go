@@ -22,8 +22,9 @@ type CreateLetterUseCase struct {
 }
 
 type CreateLetterInput struct {
-	Title      string `json:"title"`
-	LetterDate string `json:"letter_date"`
+	Direction  letter.Direction `json:"direction"`
+	Title      string           `json:"title"`
+	LetterDate string           `json:"letter_date"`
 
 	DisplayLetterNumber *string `json:"display_letter_number"`
 
@@ -58,9 +59,10 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		return nil, errors.New("letter_date must be in Jalali YYYY/MM/DD format")
 	}
 
-	cfg := uc.configProvider.Get(ctx)
+	cfg := uc.configProvider.Get(ctx, input.Direction)
 
 	l := &letter.Letter{
+		Direction:  input.Direction,
 		Title:      input.Title,
 		LetterDate: letterDate,
 
@@ -79,7 +81,7 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 			return nil, errors.New("display_letter_number is required in manual numbering mode")
 		}
 
-		exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, *input.DisplayLetterNumber)
+		exists, err := uc.letterRepo.ExistsByDisplayLetterNumber(ctx, input.Direction, *input.DisplayLetterNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check display letter number uniqueness: %w", err)
 		}
@@ -88,7 +90,7 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 			return nil, errors.New("display_letter_number already exists")
 		}
 
-		nextNumber, err := uc.letterRepo.NextNumber(ctx)
+		nextNumber, err := uc.letterRepo.NextNumber(ctx, input.Direction)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate internal letter number: %w", err)
 		}
@@ -99,7 +101,7 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		jalaliYear := resolveJalaliYear(letterDate, cfg)
 		yearSuffix := BuildJalaliYearSuffix(jalaliYear, cfg.YearlyPrefixDigits)
 
-		nextSerial, err := uc.letterRepo.NextNumberForYear(ctx, jalaliYear)
+		nextSerial, err := uc.letterRepo.NextNumberForYear(ctx, input.Direction, jalaliYear)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate yearly letter number: %w", err)
 		}
@@ -109,7 +111,7 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 		l.LetterYearSuffix = &yearSuffix
 		l.LetterSerial = &nextSerial
 	} else {
-		nextNumber, err := uc.letterRepo.NextNumber(ctx)
+		nextNumber, err := uc.letterRepo.NextNumber(ctx, input.Direction)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate letter number: %w", err)
 		}
@@ -127,6 +129,9 @@ func (uc *CreateLetterUseCase) Execute(ctx context.Context, input CreateLetterIn
 }
 
 func normalizeCreateLetterInput(input CreateLetterInput) CreateLetterInput {
+	if input.Direction == "" {
+		input.Direction = letter.DirectionIncoming
+	}
 	input.Title = strings.TrimSpace(input.Title)
 	input.LetterDate = strings.TrimSpace(input.LetterDate)
 	input.Sender = strings.TrimSpace(input.Sender)
@@ -147,6 +152,9 @@ func normalizeCreateLetterInput(input CreateLetterInput) CreateLetterInput {
 }
 
 func validateCreateLetterInput(input CreateLetterInput) error {
+	if !input.Direction.IsValid() {
+		return errors.New("direction must be incoming or outgoing")
+	}
 	if input.ActorUserID == "" {
 		return errors.New("actor user id is required")
 	}

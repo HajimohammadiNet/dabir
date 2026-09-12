@@ -2,8 +2,20 @@ package letter
 
 import "time"
 
+type Direction string
+
+const (
+	DirectionIncoming Direction = "incoming"
+	DirectionOutgoing Direction = "outgoing"
+)
+
+func (d Direction) IsValid() bool {
+	return d == DirectionIncoming || d == DirectionOutgoing
+}
+
 type Letter struct {
 	ID           string
+	Direction    Direction
 	LetterNumber int64
 
 	DisplayLetterNumber *string

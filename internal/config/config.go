@@ -42,6 +42,7 @@ type DatabaseConfig struct {
 
 type StorageConfig struct {
 	Endpoint               string `env:"S3_ENDPOINT" envDefault:"http://localhost:9000"`
+	PublicEndpoint         string `env:"S3_PUBLIC_ENDPOINT"`
 	Region                 string `env:"S3_REGION" envDefault:"us-east-1"`
 	Bucket                 string `env:"S3_BUCKET" envDefault:"dabir-attachments"`
 	AccessKey              string `env:"S3_ACCESS_KEY"`

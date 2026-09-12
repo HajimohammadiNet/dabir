@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/hajimohammadinet/dabir/internal/domain/letter"
 	domainsettings "github.com/hajimohammadinet/dabir/internal/domain/settings"
 )
 
@@ -17,10 +18,17 @@ func NewLetterConfigProvider(settingsRepo domainsettings.Repository) *LetterConf
 	}
 }
 
-func (p *LetterConfigProvider) Get(ctx context.Context) LetterNumberConfig {
+func (p *LetterConfigProvider) Get(ctx context.Context, direction letter.Direction) LetterNumberConfig {
 	domainConfig := domainsettings.DefaultLetterConfig()
+	settingKey := domainsettings.KeyLetterConfig
+	if direction == letter.DirectionOutgoing {
+		settingKey = domainsettings.KeyOutgoingLetterConfig
+	}
 
-	setting, err := p.settingsRepo.Get(ctx, domainsettings.KeyLetterConfig)
+	setting, err := p.settingsRepo.Get(ctx, settingKey)
+	if err == nil && setting == nil && direction == letter.DirectionOutgoing {
+		setting, err = p.settingsRepo.Get(ctx, domainsettings.KeyLetterConfig)
+	}
 	if err == nil && setting != nil {
 		var stored domainsettings.LetterConfig
 		if err := json.Unmarshal(setting.Value, &stored); err == nil {

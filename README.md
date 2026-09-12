@@ -4,19 +4,20 @@
 
 **Dabir** is an open-source letter numbering and registry system for organizations that need a simple, auditable, and structured replacement for spreadsheet-based letter tracking.
 
-It provides a clean backend API, a web-based admin panel, role-based access control, Jalali date support, Excel migration, manual numbering, scanned letter attachments, S3-compatible object storage integration, and Kubernetes-ready deployment manifests.
+It provides a clean backend API, a web-based admin panel, incoming and outgoing letter registries, role-based access control, Jalali date support, Excel migration, manual numbering, scanned letter attachments, S3-compatible object storage integration, and Kubernetes-ready deployment manifests.
 
 ---
 
 ## Features
 
-- Letter numbering and registry management
+- Incoming letter registry
+- Outgoing letter registry
 - Create, edit, preview, soft-delete, and search letters
 - Multiple numbering modes:
   - Fixed prefix numbering, such as `DABIR-000001`
   - Jalali yearly numbering, such as `405-0001`
   - Manual numbering, such as `405-158`, `405-ق-103`, or any custom structure
-- Smart manual number suggestion based on the entered prefix
+- Independent direction-aware numbering and smart manual number suggestions
 - Support for Persian and Arabic digits in date and number inputs
 - Jalali / Persian calendar support
 - Persian and English UI foundation
@@ -126,6 +127,7 @@ DB_PASSWORD=change-this-db-password
 JWT_SECRET=change-this-secret-in-production
 
 S3_ENDPOINT=http://localhost:9000
+S3_PUBLIC_ENDPOINT=http://localhost:9000
 S3_REGION=us-east-1
 S3_BUCKET=dabir-attachments
 S3_ACCESS_KEY=dabir
@@ -141,6 +143,11 @@ Start services:
 ```bash
 make compose-up
 ```
+
+Compose connects the API to MinIO at `http://minio:9000` and uses
+`S3_PUBLIC_ENDPOINT` when signing browser-facing attachment URLs. It also waits
+for MinIO, creates `S3_BUCKET` if needed, and explicitly keeps the bucket
+private. No manual bucket setup is required.
 
 Run migrations:
 
@@ -160,7 +167,7 @@ On the first run, Dabir redirects to the setup page where you can create the fir
 
 ## Local Development
 
-Start PostgreSQL and MinIO:
+Start PostgreSQL, MinIO, the API, and the web application:
 
 ```bash
 make compose-up
@@ -211,6 +218,8 @@ password: dabir_minio_secret
 ## Numbering Modes
 
 Dabir supports multiple numbering modes to fit different organizational workflows.
+
+Incoming and outgoing letters use independent fixed and yearly sequence namespaces. Manual number duplicate checks and smart suggestions are also scoped to direction, so the same manual number can exist once in each registry without one direction influencing the other. Existing installations automatically classify pre-feature rows as incoming letters.
 
 ### Fixed Prefix
 
@@ -299,6 +308,7 @@ Required environment variables:
 
 ```env
 S3_ENDPOINT=http://minio:9000
+S3_PUBLIC_ENDPOINT=http://localhost:9000
 S3_REGION=us-east-1
 S3_BUCKET=dabir-attachments
 S3_ACCESS_KEY=dabir
@@ -308,6 +318,20 @@ S3_FORCE_PATH_STYLE=true
 S3_PRESIGNED_URL_TTL_MINUTES=15
 S3_MAX_UPLOAD_SIZE_MB=20
 ```
+
+`S3_ENDPOINT` is the backend's network path to object storage.
+`S3_PUBLIC_ENDPOINT` is optional and defaults to `S3_ENDPOINT`; set it whenever
+the browser reaches the same S3 service through a different host or scheme. In
+Docker Compose, those values are `http://minio:9000` and
+`http://localhost:9000` respectively. The backend signs directly against the
+public endpoint, so the signature remains valid without exposing credentials
+or rewriting URLs in the frontend.
+
+The Compose environment uses the official Quay-hosted MinIO server
+`RELEASE.2025-09-07T16-13-09Z` and MinIO client
+`RELEASE.2025-08-13T08-35-41Z`. The one-shot `minio-init` service waits for a
+healthy server, creates the configured bucket idempotently, and removes any
+anonymous access policy.
 
 For production, use a private bucket and a dedicated access key with limited permissions to only the required bucket.
 
@@ -381,6 +405,7 @@ Example values:
 api:
   env:
     S3_ENDPOINT: "https://s3.example.com"
+    S3_PUBLIC_ENDPOINT: "https://s3.example.com"
     S3_REGION: "us-east-1"
     S3_BUCKET: "dabir-attachments"
     S3_USE_SSL: "true"
@@ -410,7 +435,9 @@ S3_SECRET_KEY
 
 ## Excel Import
 
-Dabir can import existing letters from Excel files.
+Dabir can import existing incoming letters from Excel files.
+
+Excel import remains intentionally incoming-only in this release. Outgoing letters can be created through the API or web UI; the existing import behavior and data mapping are unchanged.
 
 Supported format:
 
@@ -460,6 +487,7 @@ Example API response:
 
 ```json
 {
+  "direction": "incoming",
   "letter_date": "2026-05-22",
   "letter_date_jalali": "1405/03/01"
 }

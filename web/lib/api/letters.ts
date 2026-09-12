@@ -1,10 +1,15 @@
 import { apiClient } from "./client";
-import type { Letter, ListLettersResponse } from "@/types/letter";
+import type {
+  Letter,
+  LetterDirection,
+  ListLettersResponse,
+} from "@/types/letter";
 
 export type ListLettersParams = {
   page?: number;
   page_size?: number;
   search?: string;
+  direction?: LetterDirection;
   sender?: string;
   receiver?: string;
   registrar_name?: string;
@@ -39,6 +44,7 @@ export async function listLetters(
 }
 
 export type CreateLetterInput = {
+  direction?: LetterDirection;
   display_letter_number?: string | null;
   title: string;
   letter_date: string;
@@ -82,8 +88,12 @@ export type LetterNumberSuggestion = {
   suggested_number?: string | null;
 };
 
-export async function getLetterNumberSuggestion(token: string, prefix: string) {
-  const query = buildQuery({ prefix });
+export async function getLetterNumberSuggestion(
+  token: string,
+  prefix: string,
+  direction: LetterDirection = "incoming"
+) {
+  const query = buildQuery({ prefix, direction });
 
   return apiClient.get<LetterNumberSuggestion>(
     `/letters/number-suggestion${query}`,

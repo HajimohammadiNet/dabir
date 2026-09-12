@@ -7,7 +7,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppShell } from "@/components/layout/app-shell";
 import { getPublicSettings } from "@/lib/api/settings";
 import { useI18n } from "@/lib/i18n/i18n-context";
-import type { PublicSettings } from "@/types/settings";
+import type { LetterNumberConfig, PublicSettings } from "@/types/settings";
 
 import {
   Card,
@@ -50,8 +50,6 @@ export default function SettingsPage() {
     };
   }, [loadSettings]);
 
-  const letterConfig = settings?.letter_config;
-
   return (
     <ProtectedRoute allowedRoles={["superuser"]}>
       <AppShell>
@@ -87,90 +85,89 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t.letterNumbering}</CardTitle>
-              <CardDescription>
-                {t.letterNumberingDescription}
-              </CardDescription>
-            </CardHeader>
+          <NumberingConfigCard
+            title={t.incomingLetterNumbering}
+            config={settings?.letter_config}
+            t={t}
+          />
 
-            <CardContent className="space-y-4">
-              <InfoRow
-                label={t.numberingMode}
-                value={
-                  letterConfig
-                    ? formatNumberingMode(letterConfig.numbering_mode, t)
-                    : "-"
-                }
-              />
-
-              {letterConfig?.numbering_mode === "fixed_prefix" ? (
-                <>
-                  <InfoRow
-                    label={t.numberPrefix}
-                    value={letterConfig.number_prefix || "-"}
-                  />
-
-                  <InfoRow
-                    label={t.numberPadding}
-                    value={String(letterConfig.number_padding)}
-                  />
-                </>
-              ) : null}
-
-              {letterConfig?.numbering_mode === "jalali_yearly" ? (
-                <>
-                  <InfoRow
-                    label={t.yearlySerialPadding}
-                    value={String(letterConfig.yearly_serial_padding)}
-                  />
-
-                  <InfoRow
-                    label={t.yearlySeparator}
-                    value={letterConfig.yearly_separator || "-"}
-                  />
-
-                  <InfoRow
-                    label={t.yearSource}
-                    value={
-                      letterConfig.year_source === "created_at"
-                        ? t.yearSourceCreatedAt
-                        : t.yearSourceLetterDate
-                    }
-                  />
-
-                  <InfoRow
-                    label={t.numberPrefix}
-                    value={String(letterConfig.yearly_prefix_digits)}
-                  />
-                </>
-              ) : null}
-
-              {letterConfig?.numbering_mode === "manual" ? (
-                <InfoRow
-                  label={t.manualNumbering}
-                  value={t.manualNumberingDescription}
-                />
-              ) : null}
-
-              {letterConfig ? (
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <div className="text-sm text-muted-foreground">
-                    {t.exampleFormattedNumber}
-                  </div>
-                  <div className="mt-2">
-                    <Badge variant="secondary" className="text-base" dir="ltr">
-                      {formatExample(letterConfig)}
-                    </Badge>
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+          <NumberingConfigCard
+            title={t.outgoingLetterNumbering}
+            config={settings?.outgoing_letter_config}
+            t={t}
+          />
         </div>
       </AppShell>
     </ProtectedRoute>
+  );
+}
+
+function NumberingConfigCard({
+  title,
+  config,
+  t,
+}: {
+  title: string;
+  config?: LetterNumberConfig;
+  t: ReturnType<typeof useI18n>["t"];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{t.letterNumberingDescription}</CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <InfoRow
+          label={t.numberingMode}
+          value={config ? formatNumberingMode(config.numbering_mode, t) : "-"}
+        />
+
+        {config?.numbering_mode === "fixed_prefix" ? (
+          <>
+            <InfoRow label={t.numberPrefix} value={config.number_prefix || "-"} />
+            <InfoRow label={t.numberPadding} value={String(config.number_padding)} />
+          </>
+        ) : null}
+
+        {config?.numbering_mode === "jalali_yearly" ? (
+          <>
+            <InfoRow
+              label={t.yearlySerialPadding}
+              value={String(config.yearly_serial_padding)}
+            />
+            <InfoRow label={t.yearlySeparator} value={config.yearly_separator || "-"} />
+            <InfoRow
+              label={t.yearSource}
+              value={
+                config.year_source === "created_at"
+                  ? t.yearSourceCreatedAt
+                  : t.yearSourceLetterDate
+              }
+            />
+            <InfoRow label={t.numberPrefix} value={String(config.yearly_prefix_digits)} />
+          </>
+        ) : null}
+
+        {config?.numbering_mode === "manual" ? (
+          <InfoRow label={t.manualNumbering} value={t.manualNumberingDescription} />
+        ) : null}
+
+        {config ? (
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <div className="text-sm text-muted-foreground">
+              {t.exampleFormattedNumber}
+            </div>
+            <div className="mt-2">
+              <Badge variant="secondary" className="text-base" dir="ltr">
+                {formatExample(config)}
+              </Badge>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

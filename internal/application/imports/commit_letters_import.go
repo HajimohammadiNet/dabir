@@ -87,12 +87,13 @@ func (uc *CommitLettersImportUseCase) Execute(ctx context.Context, input CommitL
 			return nil, fmt.Errorf("display letter number is required at row %d", row.RowNumber)
 		}
 
-		internalNumber, err := uc.letterRepo.NextNumber(ctx)
+		internalNumber, err := uc.letterRepo.NextNumber(ctx, letter.DirectionIncoming)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate internal letter number at row %d: %w", row.RowNumber, err)
 		}
 
 		letters = append(letters, letter.Letter{
+			Direction:           letter.DirectionIncoming,
 			LetterNumber:        internalNumber,
 			DisplayLetterNumber: &displayNumber,
 			Title:               row.Title,

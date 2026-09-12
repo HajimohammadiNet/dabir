@@ -14,6 +14,7 @@ import (
 	"github.com/hajimohammadinet/dabir/internal/delivery/http/middleware"
 	"github.com/hajimohammadinet/dabir/internal/delivery/http/response"
 	domainaudit "github.com/hajimohammadinet/dabir/internal/domain/audit"
+	"github.com/hajimohammadinet/dabir/internal/domain/letter"
 )
 
 type LetterHandler struct {
@@ -104,6 +105,7 @@ func (h *LetterHandler) List(w http.ResponseWriter, r *http.Request) {
 		Page:           page,
 		PageSize:       pageSize,
 		Search:         query.Get("search"),
+		Direction:      letter.Direction(query.Get("direction")),
 		RegistrarName:  query.Get("registrar_name"),
 		Sender:         query.Get("sender"),
 		Receiver:       query.Get("receiver"),
@@ -125,7 +127,8 @@ func (h *LetterHandler) SuggestNumber(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
 	output, err := h.suggestLetterNumberUseCase.Execute(r.Context(), lettersapp.SuggestLetterNumberInput{
-		Prefix: query.Get("prefix"),
+		Prefix:    query.Get("prefix"),
+		Direction: letter.Direction(query.Get("direction")),
 	})
 	if err != nil {
 		response.Error(w, http.StatusBadRequest, "SUGGEST_LETTER_NUMBER_FAILED", err.Error())
@@ -227,6 +230,12 @@ func (h *LetterHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	actorID := authUser.ID
 	entityID := id
+	deleteAuditValue := map[string]interface{}{
+		"deleted": true,
+	}
+	if oldOutput != nil {
+		deleteAuditValue["direction"] = oldOutput.Direction
+	}
 
 	h.auditLogger.Log(r.Context(), auditapp.LogInput{
 		ActorUserID: &actorID,
@@ -236,9 +245,7 @@ func (h *LetterHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		IPAddress:   requestIP(r),
 		UserAgent:   requestUserAgent(r),
 		OldValue:    oldOutput,
-		NewValue: map[string]interface{}{
-			"deleted": true,
-		},
+		NewValue:    deleteAuditValue,
 	})
 
 	response.JSON(w, http.StatusOK, map[string]bool{

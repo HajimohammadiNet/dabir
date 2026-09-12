@@ -12,9 +12,10 @@ import (
 )
 
 type LetterDTO struct {
-	ID                    string `json:"id"`
-	LetterNumber          int64  `json:"letter_number"`
-	FormattedLetterNumber string `json:"formatted_letter_number"`
+	ID                    string           `json:"id"`
+	Direction             letter.Direction `json:"direction"`
+	LetterNumber          int64            `json:"letter_number"`
+	FormattedLetterNumber string           `json:"formatted_letter_number"`
 
 	DisplayLetterNumber *string `json:"display_letter_number,omitempty"`
 
@@ -65,6 +66,7 @@ type LetterNumberConfig struct {
 func ToLetterDTO(l letter.Letter, cfg LetterNumberConfig) LetterDTO {
 	return LetterDTO{
 		ID:                    l.ID,
+		Direction:             l.Direction,
 		LetterNumber:          l.LetterNumber,
 		FormattedLetterNumber: FormatLetterNumber(l, cfg),
 		DisplayLetterNumber:   l.DisplayLetterNumber,

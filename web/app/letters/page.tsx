@@ -11,7 +11,7 @@ import { LetterNumberText } from "@/components/common/letter-number-text";
 import { useAuth } from "@/contexts/auth-context";
 import { deleteLetter, listLetters } from "@/lib/api/letters";
 import { useI18n } from "@/lib/i18n/i18n-context";
-import type { Letter } from "@/types/letter";
+import type { Letter, LetterDirection } from "@/types/letter";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +49,11 @@ const DEFAULT_PAGE_SIZE = 20;
 type SortBy = "created_at" | "letter_date" | "letter_number";
 type SortOrder = "asc" | "desc";
 
-export default function LettersPage() {
+export function LetterListPage({
+  direction,
+}: {
+  direction: LetterDirection;
+}) {
   const { token, user } = useAuth();
   const { t } = useI18n();
 
@@ -72,6 +76,13 @@ export default function LettersPage() {
 
   const canCreate = user?.role === "superuser" || user?.role === "editor";
   const canDelete = user?.role === "superuser" || user?.role === "editor";
+  const routeBase = direction === "outgoing" ? "/outgoing-letters" : "/letters";
+  const pageTitle =
+    direction === "outgoing" ? t.outgoingLetters : t.incomingLetters;
+  const pageDescription =
+    direction === "outgoing"
+      ? t.outgoingLettersDescription
+      : t.incomingLettersDescription;
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(total / pageSize));
@@ -87,6 +98,7 @@ export default function LettersPage() {
 
     try {
       const result = await listLetters(token, {
+        direction,
         page,
         page_size: pageSize,
         search: appliedSearch,
@@ -101,7 +113,7 @@ export default function LettersPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, page, pageSize, appliedSearch, sortBy, sortOrder]);
+  }, [token, direction, page, pageSize, appliedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     const timeoutID = window.setTimeout(() => {
@@ -151,14 +163,18 @@ export default function LettersPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-3xl font-bold tracking-tight">
-                {t.letters}
+                {pageTitle}
               </h1>
-              <p className="text-muted-foreground">{t.lettersDescription}</p>
+              <p className="text-muted-foreground">{pageDescription}</p>
             </div>
 
             {canCreate ? (
-              <Link href="/letters/new">
-                <Button>{t.newLetter}</Button>
+              <Link href={`${routeBase}/new`}>
+                <Button>
+                  {direction === "outgoing"
+                    ? t.newOutgoingLetter
+                    : t.newIncomingLetter}
+                </Button>
               </Link>
             ) : null}
           </div>
@@ -188,11 +204,11 @@ export default function LettersPage() {
 
           <Card className="max-w-full overflow-hidden">
             <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <CardTitle>{t.letters}</CardTitle>
+              <CardTitle>{pageTitle}</CardTitle>
 
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 <span>
-                  نمایش {startItem} تا {endItem} از {total}
+                  {t.showing} {startItem}–{endItem} {t.of} {total}
                 </span>
 
                 <select
@@ -203,9 +219,9 @@ export default function LettersPage() {
                   }}
                   className="rounded-md border bg-background px-2 py-1 text-sm"
                 >
-                  <option value="created_at">زمان ثبت</option>
-                  <option value="letter_date">تاریخ نامه</option>
-                  <option value="letter_number">شماره نامه</option>
+                  <option value="created_at">{t.sortCreatedAt}</option>
+                  <option value="letter_date">{t.sortLetterDate}</option>
+                  <option value="letter_number">{t.sortLetterNumber}</option>
                 </select>
 
                 <select
@@ -216,8 +232,8 @@ export default function LettersPage() {
                   }}
                   className="rounded-md border bg-background px-2 py-1 text-sm"
                 >
-                  <option value="desc">نزولی</option>
-                  <option value="asc">صعودی</option>
+                  <option value="desc">{t.sortDescending}</option>
+                  <option value="asc">{t.sortAscending}</option>
                 </select>
 
                 <select
@@ -234,7 +250,7 @@ export default function LettersPage() {
             </CardHeader>
 
             <CardContent className="min-w-0">
-              <div className="rounded-md border">
+              <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -270,7 +286,11 @@ export default function LettersPage() {
                           colSpan={8}
                           className="py-10 text-center text-muted-foreground"
                         >
-                          {loading ? t.commonLoading : t.noLettersFound}
+                          {loading
+                            ? t.commonLoading
+                            : direction === "outgoing"
+                              ? t.noOutgoingLettersFound
+                              : t.noIncomingLettersFound}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -340,9 +360,9 @@ export default function LettersPage() {
                               </Button>
 
                               {canDelete ? (
-                                <Link href={`/letters/${letter.id}/edit`}>
+                                <Link href={`${routeBase}/${letter.id}/edit`}>
                                   <Button variant="outline" size="sm">
-                                    ویرایش
+                                    {t.commonUpdate}
                                   </Button>
                                 </Link>
                               ) : null}
@@ -367,7 +387,7 @@ export default function LettersPage() {
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
                 <div className="text-sm text-muted-foreground">
-                  صفحه {page} از {totalPages}
+                  {t.page} {page} {t.of} {totalPages}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -380,7 +400,7 @@ export default function LettersPage() {
                       setPage((current) => Math.max(1, current - 1))
                     }
                   >
-                    قبلی
+                    {t.previous}
                   </Button>
 
                   <Button
@@ -392,7 +412,7 @@ export default function LettersPage() {
                       setPage((current) => Math.min(totalPages, current + 1))
                     }
                   >
-                    بعدی
+                    {t.next}
                   </Button>
                 </div>
               </div>
@@ -416,6 +436,10 @@ export default function LettersPage() {
       </AppShell>
     </ProtectedRoute>
   );
+}
+
+export default function LettersPage() {
+  return <LetterListPage direction="incoming" />;
 }
 
 function LetterPreviewDialog({
@@ -487,7 +511,11 @@ function LetterPreviewDialog({
     <Dialog open={Boolean(letter)} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
         <DialogHeader>
-          <DialogTitle>{t.letterDetails}</DialogTitle>
+          <DialogTitle>
+            {letter?.direction === "outgoing"
+              ? t.outgoingLetterDetails
+              : t.incomingLetterDetails}
+          </DialogTitle>
           <DialogDescription>
             {letter ? (
               <LetterNumberText value={letter.formatted_letter_number} />
@@ -537,7 +565,7 @@ function LetterPreviewDialog({
                 <div className="text-sm text-muted-foreground">{t.commonLoading}</div>
               ) : attachments.length === 0 ? (
                 <div className="rounded-md border bg-background/60 p-3 text-sm text-muted-foreground">
-                  فایلی برای این نامه ثبت نشده است.
+                  {t.noAttachments}
                 </div>
               ) : (
                 <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
@@ -562,7 +590,7 @@ function LetterPreviewDialog({
                           size="sm"
                           onClick={() => void handleOpenAttachment(attachment)}
                         >
-                          مشاهده
+                          {t.viewFile}
                         </Button>
                       </div>
                     </div>
@@ -577,9 +605,15 @@ function LetterPreviewDialog({
               </Button>
 
               {canDelete && !letter.is_deleted ? (
-                <Link href={`/letters/${letter.id}/edit`}>
+                <Link
+                  href={`${
+                    letter.direction === "outgoing"
+                      ? "/outgoing-letters"
+                      : "/letters"
+                  }/${letter.id}/edit`}
+                >
                   <Button variant="outline" onClick={onClose}>
-                    ویرایش
+                    {t.commonUpdate}
                   </Button>
                 </Link>
               ) : null}

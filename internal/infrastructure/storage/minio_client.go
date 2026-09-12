@@ -14,25 +14,29 @@ import (
 )
 
 type MinIOClient struct {
-	client *minio.Client
-	bucket string
+	client        *minio.Client
+	presignClient *minio.Client
+	bucket        string
 }
 
 func NewMinIOClient(cfg appconfig.StorageConfig) (*MinIOClient, error) {
-	endpoint := normalizeEndpoint(cfg.Endpoint)
-
-	client, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure: cfg.UseSSL,
-		Region: cfg.Region,
-	})
+	client, err := newClient(cfg.Endpoint, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create minio client: %w", err)
 	}
 
+	presignClient := client
+	if strings.TrimSpace(cfg.PublicEndpoint) != "" {
+		presignClient, err = newClient(cfg.PublicEndpoint, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create public minio client: %w", err)
+		}
+	}
+
 	return &MinIOClient{
-		client: client,
-		bucket: cfg.Bucket,
+		client:        client,
+		presignClient: presignClient,
+		bucket:        cfg.Bucket,
 	}, nil
 }
 
@@ -60,7 +64,7 @@ func (c *MinIOClient) PresignedGetObjectURL(ctx context.Context, input domainsto
 		ttl = 15 * time.Minute
 	}
 
-	presignedURL, err := c.client.PresignedGetObject(
+	presignedURL, err := c.presignClient.PresignedGetObject(
 		ctx,
 		c.bucket,
 		input.ObjectKey,
@@ -97,4 +101,25 @@ func normalizeEndpoint(endpoint string) string {
 	endpoint = strings.TrimPrefix(endpoint, "https://")
 
 	return endpoint
+}
+
+func newClient(endpoint string, cfg appconfig.StorageConfig) (*minio.Client, error) {
+	secure := cfg.UseSSL
+	trimmedEndpoint := strings.TrimSpace(endpoint)
+
+	if parsed, err := url.Parse(trimmedEndpoint); err == nil && parsed.Scheme != "" {
+		secure = strings.EqualFold(parsed.Scheme, "https")
+	}
+
+	bucketLookup := minio.BucketLookupAuto
+	if cfg.ForcePathStyle {
+		bucketLookup = minio.BucketLookupPath
+	}
+
+	return minio.New(normalizeEndpoint(trimmedEndpoint), &minio.Options{
+		Creds:        credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure:       secure,
+		Region:       cfg.Region,
+		BucketLookup: bucketLookup,
+	})
 }

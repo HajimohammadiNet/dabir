@@ -10,8 +10,9 @@ type Setting struct {
 }
 
 const (
-	KeyOrganizationName = "organization_name"
-	KeyLetterConfig     = "letter_config"
+	KeyOrganizationName     = "organization_name"
+	KeyLetterConfig         = "letter_config"
+	KeyOutgoingLetterConfig = "outgoing_letter_config"
 )
 
 type NumberingMode string

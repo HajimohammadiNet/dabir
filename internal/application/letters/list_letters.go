@@ -19,6 +19,7 @@ type ListLettersInput struct {
 	PageSize int
 
 	Search        string
+	Direction     letter.Direction
 	RegistrarName string
 	Sender        string
 	Receiver      string
@@ -51,6 +52,12 @@ func NewListLettersUseCase(
 }
 
 func (uc *ListLettersUseCase) Execute(ctx context.Context, input ListLettersInput) (*ListLettersOutput, error) {
+	if input.Direction == "" {
+		input.Direction = letter.DirectionIncoming
+	}
+	if !input.Direction.IsValid() {
+		return nil, errors.New("direction must be incoming or outgoing")
+	}
 	if input.Page <= 0 {
 		input.Page = 1
 	}
@@ -75,11 +82,13 @@ func (uc *ListLettersUseCase) Execute(ctx context.Context, input ListLettersInpu
 		Page:           input.Page,
 		PageSize:       input.PageSize,
 		Search:         input.Search,
+		Direction:      input.Direction,
 		RegistrarName:  input.RegistrarName,
 		Sender:         input.Sender,
 		Receiver:       input.Receiver,
-		IncludeDeleted: input.IncludeDeleted, SortBy: input.SortBy,
-		SortOrder: input.SortOrder,
+		IncludeDeleted: input.IncludeDeleted,
+		SortBy:         input.SortBy,
+		SortOrder:      input.SortOrder,
 	}
 
 	if input.FromDate != "" {
@@ -105,8 +114,7 @@ func (uc *ListLettersUseCase) Execute(ctx context.Context, input ListLettersInpu
 		return nil, err
 	}
 
-	cfg := uc.configProvider.Get(ctx)
-
+	cfg := uc.configProvider.Get(ctx, input.Direction)
 	items := make([]LetterDTO, 0, len(lettersList))
 	for _, l := range lettersList {
 		items = append(items, ToLetterDTO(l, cfg))

@@ -16,7 +16,7 @@ import {
 
 import { getPublicSettings } from "@/lib/api/settings";
 import { useI18n } from "@/lib/i18n/i18n-context";
-import type { Letter } from "@/types/letter";
+import type { Letter, LetterDirection } from "@/types/letter";
 import type { NumberingMode } from "@/types/settings";
 
 import { Button } from "@/components/ui/button";
@@ -41,10 +41,15 @@ import { JalaliDatePicker } from "@/components/common/jalali-date-picker";
 import { LetterNumberText } from "@/components/common/letter-number-text";
 import { uploadLetterAttachments } from "@/lib/api/attachments";
 
-export default function NewLetterPage() {
+export function NewLetterPage({
+  direction,
+}: {
+  direction: LetterDirection;
+}) {
   const router = useRouter();
   const { token } = useAuth();
   const { t } = useI18n();
+  const routeBase = direction === "outgoing" ? "/outgoing-letters" : "/letters";
 
   const [numberingMode, setNumberingMode] =
     useState<NumberingMode>("fixed_prefix");
@@ -79,10 +84,15 @@ export default function NewLetterPage() {
   const loadPageData = useCallback(async () => {
     try {
       const settings = await getPublicSettings();
-      setNumberingMode(settings.letter_config.numbering_mode);
+      const numberConfig =
+        direction === "outgoing"
+          ? settings.outgoing_letter_config
+          : settings.letter_config;
+      setNumberingMode(numberConfig.numbering_mode);
 
       if (token) {
         const lettersResult = await listLetters(token, {
+            direction,
             page: 1,
             page_size: 1,
             sort_by: "created_at",
@@ -100,7 +110,7 @@ export default function NewLetterPage() {
         err instanceof Error ? err.message : "Failed to load letter settings"
       );
     }
-  }, [token]);
+  }, [token, direction]);
 
   useEffect(() => {
     const timeoutID = window.setTimeout(() => {
@@ -125,7 +135,7 @@ export default function NewLetterPage() {
         setSuggestionLoading(true);
 
         try {
-        const result = await getLetterNumberSuggestion(token, prefix);
+        const result = await getLetterNumberSuggestion(token, prefix, direction);
         setPatternSuggestion(result);
         } catch {
         setPatternSuggestion(null);
@@ -137,7 +147,7 @@ export default function NewLetterPage() {
     return () => {
         window.clearTimeout(timeoutID);
     };
-    }, [token, numberingMode, displayLetterNumber]);
+    }, [token, direction, numberingMode, displayLetterNumber]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -153,6 +163,7 @@ export default function NewLetterPage() {
 
     try {
       const letter = await createLetter(token, {
+        direction,
         display_letter_number:
           numberingMode === "manual" ? displayLetterNumber.trim() : null,
         title,
@@ -167,13 +178,13 @@ export default function NewLetterPage() {
 
         try {
           await uploadLetterAttachments(token, letter.id, selectedFiles);
-          toast.success("فایل‌های پیوست با موفقیت آپلود شدند");
+          toast.success(t.attachmentsUploaded);
           setSelectedFiles([]);
         } catch (err) {
           toast.error(
             err instanceof Error
               ? err.message
-              : "نامه ثبت شد اما آپلود فایل‌ها ناموفق بود"
+              : t.letterCreatedUploadFailed
           );
         } finally {
           setUploadingAttachments(false);
@@ -184,7 +195,7 @@ export default function NewLetterPage() {
       setResultDialogOpen(true);
       setLastLetterNumber(letter.formatted_letter_number);
 
-      toast.success(`${letter.formatted_letter_number} ثبت شد`);
+      toast.success(`${t.letterCreatedTitle}: ${letter.formatted_letter_number}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create letter");
     } finally {
@@ -210,9 +221,15 @@ export default function NewLetterPage() {
         <div className="max-w-2xl space-y-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {t.newLetter}
+              {direction === "outgoing"
+                ? t.newOutgoingLetter
+                : t.newIncomingLetter}
             </h1>
-            <p className="text-muted-foreground">{t.lettersDescription}</p>
+            <p className="text-muted-foreground">
+              {direction === "outgoing"
+                ? t.outgoingLettersDescription
+                : t.incomingLettersDescription}
+            </p>
           </div>
 
           {numberingMode === "manual" ? (
@@ -259,8 +276,8 @@ export default function NewLetterPage() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <span>
                             {displayLetterNumber.trim()
-                                ? "آخرین شماره مشابه:"
-                                : "آخرین شماره کلی:"}
+                                ? t.lastSimilarNumber
+                                : t.lastOverallNumber}
                             </span>
 
                             <span className="font-medium">
@@ -275,7 +292,7 @@ export default function NewLetterPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span>شماره پیشنهادی بعدی:</span>
+                            <span>{t.suggestedNextNumber}</span>
 
                             <span className="font-medium">
                             {suggestionLoading ? (
@@ -295,7 +312,7 @@ export default function NewLetterPage() {
                             size="sm"
                             onClick={() => setDisplayLetterNumber(suggestedLetterNumber)}
                             >
-                            استفاده از پیشنهاد
+                            {t.useSuggestion}
                             </Button>
                         ) : null}
                         </div>
@@ -363,7 +380,7 @@ export default function NewLetterPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="attachments">اسکن نامه / پیوست‌ها</Label>
+                  <Label htmlFor="attachments">{t.attachments}</Label>
 
                   <Input
                     id="attachments"
@@ -376,12 +393,12 @@ export default function NewLetterPage() {
                   />
 
                   <p className="text-xs text-muted-foreground">
-                    آپلود فایل اختیاری است. فرمت‌های مجاز: PDF, JPG, PNG
+                    {t.attachmentUploadHelp}
                   </p>
 
                   {selectedFiles.length > 0 ? (
                     <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                      <div className="mb-2 font-medium">فایل‌های انتخاب‌شده:</div>
+                      <div className="mb-2 font-medium">{t.selectedFiles}</div>
 
                       <ul className="space-y-1 text-muted-foreground">
                         {selectedFiles.map((file) => (
@@ -402,7 +419,7 @@ export default function NewLetterPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => router.push("/letters")}
+                    onClick={() => router.push(routeBase)}
                   >
                     {t.commonCancel}
                   </Button>
@@ -419,9 +436,9 @@ export default function NewLetterPage() {
           >
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>نامه با موفقیت ثبت شد</DialogTitle>
+                <DialogTitle>{t.letterCreatedTitle}</DialogTitle>
                 <DialogDescription>
-                  شماره نامه و اطلاعات ثبت‌شده در ادامه نمایش داده شده است.
+                  {t.letterCreatedDescription}
                 </DialogDescription>
               </DialogHeader>
 
@@ -429,7 +446,7 @@ export default function NewLetterPage() {
                 <div className="space-y-6">
                   <div className="rounded-xl border bg-muted/30 p-6 text-center">
                     <div className="text-sm text-muted-foreground">
-                      شماره نامه
+                      {t.number}
                     </div>
                     <div
                       className="mt-2 text-4xl font-bold tracking-wide"
@@ -470,12 +487,12 @@ export default function NewLetterPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => router.push("/letters")}>
-                      رفتن به لیست نامه‌ها
+                    <Button onClick={() => router.push(routeBase)}>
+                      {t.goToLetters}
                     </Button>
 
                     <Button variant="outline" onClick={resetForm}>
-                      ثبت نامه جدید
+                      {t.registerAnotherLetter}
                     </Button>
                   </div>
                 </div>
@@ -486,6 +503,10 @@ export default function NewLetterPage() {
       </AppShell>
     </ProtectedRoute>
   );
+}
+
+export default function IncomingNewLetterPage() {
+  return <NewLetterPage direction="incoming" />;
 }
 
 function InfoRow({
@@ -538,12 +559,12 @@ function extractSuggestionPrefix(value: string) {
 
 function suggestNextLetterNumber(lastNumber: string | null) {
   if (!lastNumber) {
-    return "405-158";
+    return "";
   }
 
-  const value = lastNumber.trim();
+  const value = normalizeDigitsForSuggestion(lastNumber.trim());
   if (!value) {
-    return "405-158";
+    return "";
   }
 
   const match = value.match(/(\d+)(?!.*\d)/);

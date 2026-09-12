@@ -9,10 +9,10 @@ info:
     - Initial setup
     - Authentication
     - User management
-    - Letter management
+    - Incoming and outgoing letter management
     - Audit logs
     - Public settings
-  version: 0.1.0
+  version: 0.6.0
   license:
     name: Apache-2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -33,7 +33,7 @@ tags:
   - name: Users
     description: User management endpoints
   - name: Letters
-    description: Letter registry endpoints
+    description: Incoming and outgoing letter registry endpoints
   - name: Imports
     description: Excel imports
   - name: Audit Logs
@@ -330,10 +330,11 @@ paths:
 
   /api/v1/letters:
     get:
+      operationId: listLetters
       tags:
         - Letters
       summary: List letters
-      description: Requires superuser, editor, or readonly role.
+      description: Requires superuser, editor, or readonly role. Direction defaults to incoming for backward compatibility.
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/PageSize"
@@ -341,6 +342,11 @@ paths:
           in: query
           schema:
             type: string
+        - name: direction
+          in: query
+          description: Letter direction. Omit to list incoming letters.
+          schema:
+            $ref: "#/components/schemas/LetterDirection"
         - name: registrar_name
           in: query
           schema:
@@ -367,6 +373,18 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [created_at, letter_date, letter_number]
+            default: letter_date
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
       responses:
         "200":
           description: Letters list
@@ -374,12 +392,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListLettersResponse"
+        "400":
+          description: Invalid direction, date, pagination, or sort parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     post:
+      operationId: createLetter
       tags:
         - Letters
       summary: Create letter
-      description: Requires superuser or editor role.
+      description: Requires superuser or editor role. Direction defaults to incoming when omitted.
       requestBody:
         required: true
         content:
@@ -400,8 +425,155 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/v1/letters/number-suggestion:
+    get:
+      operationId: suggestLetterNumber
+      tags:
+        - Letters
+      summary: Suggest the next manual letter number
+      description: Requires superuser, editor, or readonly role. The lookup is scoped to direction, which defaults to incoming.
+      parameters:
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          example: 405-ق-
+        - name: direction
+          in: query
+          schema:
+            $ref: "#/components/schemas/LetterDirection"
+      responses:
+        "200":
+          description: Direction-aware number suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LetterNumberSuggestionResponse"
+        "400":
+          description: Invalid direction or suggestion request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/letters/{id}/attachments:
+    get:
+      operationId: listLetterAttachments
+      tags:
+        - Letters
+      summary: List letter attachments
+      description: Requires superuser, editor, or readonly role.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: Active attachments for the letter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentListResponse"
+        "400":
+          description: Letter not found or attachment list failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: uploadLetterAttachments
+      tags:
+        - Letters
+      summary: Upload letter attachments
+      description: Requires superuser or editor role. Supports multiple private PDF, JPG, or PNG files using the configured maximum upload size.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "201":
+          description: Attachments uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentListResponse"
+        "400":
+          description: Invalid file, size, type, or letter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/letters/{id}/attachments/{attachment_id}/download-url:
+    get:
+      operationId: getLetterAttachmentDownloadUrl
+      tags:
+        - Letters
+      summary: Create a private attachment download URL
+      description: Requires superuser, editor, or readonly role. Returns a short-lived server-generated presigned URL.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+        - name: attachment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Presigned download URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentDownloadURLResponse"
+        "400":
+          description: Letter attachment not found or URL generation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/letters/{id}/attachments/{attachment_id}:
+    delete:
+      operationId: deleteLetterAttachment
+      tags:
+        - Letters
+      summary: Delete a letter attachment
+      description: Requires superuser or editor role. Soft-deletes attachment metadata and removes the private object.
+      parameters:
+        - $ref: "#/components/parameters/ID"
+        - name: attachment_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Attachment deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BooleanActionResponse"
+        "400":
+          description: Letter attachment not found or deletion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/v1/letters/{id}:
     get:
+      operationId: getLetter
       tags:
         - Letters
       summary: Get letter by ID
@@ -423,6 +595,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
     patch:
+      operationId: updateLetter
       tags:
         - Letters
       summary: Update letter
@@ -442,8 +615,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LetterResponse"
+        "400":
+          description: Invalid update request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     delete:
+      operationId: deleteLetter
       tags:
         - Letters
       summary: Soft delete letter
@@ -457,6 +637,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BooleanActionResponse"
+        "404":
+          description: Letter not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 
   /api/v1/imports/letters/preview:
@@ -874,18 +1060,35 @@ components:
         data:
           $ref: "#/components/schemas/InitializeData"
 
+    LetterNumberConfig:
+      type: object
+      properties:
+        numbering_mode:
+          type: string
+          enum: [fixed_prefix, jalali_yearly, manual]
+        number_prefix:
+          type: string
+        number_padding:
+          type: integer
+        yearly_prefix_digits:
+          type: integer
+        yearly_serial_padding:
+          type: integer
+        yearly_separator:
+          type: string
+        year_source:
+          type: string
+          enum: [letter_date, created_at]
+
     PublicSettings:
       type: object
       properties:
         organization_name:
           type: string
         letter_config:
-          type: object
-          properties:
-            number_prefix:
-              type: string
-            number_padding:
-              type: integer
+          $ref: "#/components/schemas/LetterNumberConfig"
+        outgoing_letter_config:
+          $ref: "#/components/schemas/LetterNumberConfig"
 
     PublicSettingsResponse:
       type: object
@@ -1042,23 +1245,46 @@ components:
         data:
           $ref: "#/components/schemas/ListUsersData"
 
+    LetterDirection:
+      type: string
+      enum: [incoming, outgoing]
+      default: incoming
+
     Letter:
       type: object
       properties:
         id:
           type: string
           format: uuid
+        direction:
+          $ref: "#/components/schemas/LetterDirection"
         letter_number:
           type: integer
           format: int64
         formatted_letter_number:
           type: string
           example: DABIR-000001
+        display_letter_number:
+          type: string
+          nullable: true
+        letter_year:
+          type: integer
+          nullable: true
+        letter_year_suffix:
+          type: string
+          nullable: true
+        letter_serial:
+          type: integer
+          format: int64
+          nullable: true
         title:
           type: string
         letter_date:
           type: string
           format: date
+        letter_date_jalali:
+          type: string
+          example: 1405/06/21
         registrar_name:
           type: string
         sender:
@@ -1100,11 +1326,18 @@ components:
         - sender
         - receiver
       properties:
+        direction:
+          $ref: "#/components/schemas/LetterDirection"
+        display_letter_number:
+          type: string
+          nullable: true
+          description: Required when the selected direction uses manual numbering.
         title:
           type: string
         letter_date:
           type: string
-          format: date
+          description: Jalali date in YYYY/MM/DD format.
+          example: 1405/06/21
         sender:
           type: string
         receiver:
@@ -1114,7 +1347,30 @@ components:
           nullable: true
 
     UpdateLetterRequest:
-      $ref: "#/components/schemas/CreateLetterRequest"
+      type: object
+      required:
+        - title
+        - letter_date
+        - sender
+        - receiver
+      properties:
+        display_letter_number:
+          type: string
+          nullable: true
+          description: Required when the letter direction uses manual numbering.
+        title:
+          type: string
+        letter_date:
+          type: string
+          description: Jalali date in YYYY/MM/DD format.
+          example: 1405/06/21
+        sender:
+          type: string
+        receiver:
+          type: string
+        description:
+          type: string
+          nullable: true
 
     LetterResponse:
       type: object
@@ -1149,6 +1405,77 @@ components:
           example: true
         data:
           $ref: "#/components/schemas/ListLettersData"
+
+    LetterNumberSuggestion:
+      type: object
+      properties:
+        prefix:
+          type: string
+        last_number:
+          type: string
+          nullable: true
+        suggested_number:
+          type: string
+          nullable: true
+
+    LetterNumberSuggestionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/LetterNumberSuggestion"
+
+    LetterAttachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        letter_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        content_type:
+          type: string
+          enum: [application/pdf, image/jpeg, image/png]
+        size_bytes:
+          type: integer
+          format: int64
+        is_deleted:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AttachmentListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/LetterAttachment"
+
+    AttachmentDownloadURLResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
 
     AuditLog:
       type: object
